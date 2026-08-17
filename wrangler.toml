@@ -1,0 +1,45 @@
+name = "reistor-ai-stylist"
+main = "src/index.ts"
+compatibility_date = "2026-08-01"
+compatibility_flags = ["nodejs_compat"]
+
+# Per-user conversation state, keyed by the WhatsApp `wa_id` (sender number).
+# Create it once with:
+#   wrangler kv namespace create STATE
+#   wrangler kv namespace create STATE --preview
+# then paste the returned ids below.
+[[kv_namespaces]]
+binding = "STATE"
+id = "f518f0dfecbc4167a8afc28e1db9d686"
+preview_id = "f559fb3aeae4452083289411f165bf87"
+
+[vars]
+# Graph API version used for every outbound WhatsApp call. Interactive product
+# carousels are a newer message type — v21.0 rejects them.
+GRAPH_API_VERSION = "v25.0"
+# Anthropic model for ranking + the free-text stylist.
+ANTHROPIC_MODEL = "claude-sonnet-5"
+
+# Commerce catalog connected to the WABA. Recommended looks render as a
+# product carousel whose cards open WhatsApp's own PDP. Unset it and the looks
+# fall back to plain image messages.
+CATALOG_ID = "1572339217700903"
+
+# Two-screen picker Flow (occasion, then category). FLOW_MODE = "draft" sends
+# the unpublished version — publishing is currently blocked by Meta's integrity
+# check on this account. Remove FLOW_MODE once publish succeeds.
+FLOW_ID = "884214467848884"
+FLOW_MODE = "draft"
+
+# Occasion / category pickers are approved carousel Marketing templates,
+# billed at ~₹0.86 per delivered message (Meta's test number does not bill).
+# A rejected send falls back to asking for a typed answer, not to a list.
+OCCASION_TEMPLATE = "occasion_picker"
+CATEGORY_TEMPLATE = "category_picker"
+TEMPLATE_LANGUAGE = "en_US"
+
+# Secrets — set these with `wrangler secret put <NAME>`, never in this file:
+#   WHATSAPP_TOKEN     Meta system-user / temporary access token
+#   PHONE_NUMBER_ID    WhatsApp Business phone number id
+#   VERIFY_TOKEN       any string; must match what you paste into Meta
+#   ANTHROPIC_API_KEY  Anthropic API key (optional — see README fallback note)

@@ -1,0 +1,458 @@
+[
+  {
+    "id": "hemp-poplin-shirt",
+    "title": "Hemp Poplin Shirt",
+    "occasionTags": ["work", "casual"],
+    "category": "tops",
+    "fabric": "hemp",
+    "attributes": "crisp hemp poplin, boxy fit, mother-of-pearl buttons, off-white",
+    "priceINR": 2999,
+    "sizes": [
+      { "size": "XS", "stock": 3 },
+      { "size": "S", "stock": 6 },
+      { "size": "M", "stock": 4 },
+      { "size": "L", "stock": 2 },
+      { "size": "XL", "stock": 0 },
+      { "size": "XXL", "stock": 1 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-poplin-shirt/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-poplin-shirt"
+  },
+  {
+    "id": "linen-notch-blouse",
+    "title": "Linen Notch Blouse",
+    "occasionTags": ["work"],
+    "category": "tops",
+    "fabric": "linen",
+    "attributes": "washed linen, notch neckline, half sleeve, slate blue",
+    "priceINR": 3199,
+    "sizes": [
+      { "size": "XS", "stock": 0 },
+      { "size": "S", "stock": 5 },
+      { "size": "M", "stock": 7 },
+      { "size": "L", "stock": 3 },
+      { "size": "XL", "stock": 2 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/linen-notch-blouse/800/1000",
+    "productUrl": "https://reistor.in/products/linen-notch-blouse"
+  },
+  {
+    "id": "modal-relaxed-tee",
+    "title": "Modal Relaxed Tee",
+    "occasionTags": ["casual", "vacation"],
+    "category": "tops",
+    "fabric": "modal",
+    "attributes": "modal jersey, drop shoulder, ribbed neck, sand",
+    "priceINR": 1899,
+    "sizes": [
+      { "size": "XS", "stock": 4 },
+      { "size": "S", "stock": 9 },
+      { "size": "M", "stock": 8 },
+      { "size": "L", "stock": 5 },
+      { "size": "XL", "stock": 3 },
+      { "size": "XXL", "stock": 2 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/modal-relaxed-tee/800/1000",
+    "productUrl": "https://reistor.in/products/modal-relaxed-tee"
+  },
+  {
+    "id": "tencel-wrap-top",
+    "title": "Tencel Wrap Top",
+    "occasionTags": ["vacation", "casual"],
+    "category": "tops",
+    "fabric": "Tencel",
+    "attributes": "Tencel twill, side-tie wrap, three-quarter sleeve, terracotta",
+    "priceINR": 2499,
+    "sizes": [
+      { "size": "XS", "stock": 2 },
+      { "size": "S", "stock": 4 },
+      { "size": "M", "stock": 0 },
+      { "size": "L", "stock": 3 },
+      { "size": "XL", "stock": 1 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/tencel-wrap-top/800/1000",
+    "productUrl": "https://reistor.in/products/tencel-wrap-top"
+  },
+  {
+    "id": "hemp-camp-collar-shirt",
+    "title": "Hemp Camp Collar Shirt",
+    "occasionTags": ["vacation", "casual"],
+    "category": "tops",
+    "fabric": "hemp",
+    "attributes": "hemp-cotton blend, camp collar, resort length, palm print",
+    "priceINR": 2899,
+    "sizes": [
+      { "size": "XS", "stock": 1 },
+      { "size": "S", "stock": 3 },
+      { "size": "M", "stock": 5 },
+      { "size": "L", "stock": 4 },
+      { "size": "XL", "stock": 2 },
+      { "size": "XXL", "stock": 1 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-camp-collar-shirt/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-camp-collar-shirt"
+  },
+  {
+    "id": "linen-shell-top",
+    "title": "Linen Shell Top",
+    "occasionTags": ["work", "casual"],
+    "category": "tops",
+    "fabric": "linen",
+    "attributes": "structured linen, sleeveless shell, high neck, ivory",
+    "priceINR": 2299,
+    "sizes": [
+      { "size": "XS", "stock": 2 },
+      { "size": "S", "stock": 6 },
+      { "size": "M", "stock": 6 },
+      { "size": "L", "stock": 0 },
+      { "size": "XL", "stock": 2 },
+      { "size": "XXL", "stock": 1 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/linen-shell-top/800/1000",
+    "productUrl": "https://reistor.in/products/linen-shell-top"
+  },
+  {
+    "id": "hemp-oversized-shirt",
+    "title": "Hemp Oversized Shirt",
+    "occasionTags": ["work", "vacation"],
+    "category": "tops",
+    "fabric": "hemp",
+    "attributes": "heavyweight hemp, oversized cut, dropped cuff, charcoal",
+    "priceINR": 3299,
+    "sizes": [
+      { "size": "XS", "stock": 0 },
+      { "size": "S", "stock": 2 },
+      { "size": "M", "stock": 4 },
+      { "size": "L", "stock": 4 },
+      { "size": "XL", "stock": 3 },
+      { "size": "XXL", "stock": 2 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-oversized-shirt/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-oversized-shirt"
+  },
+  {
+    "id": "modal-column-shirt",
+    "title": "Modal Column Shirt",
+    "occasionTags": ["work"],
+    "category": "tops",
+    "fabric": "modal",
+    "attributes": "soft modal drape, concealed placket, longline, ink",
+    "priceINR": 2799,
+    "sizes": [
+      { "size": "XS", "stock": 3 },
+      { "size": "S", "stock": 5 },
+      { "size": "M", "stock": 3 },
+      { "size": "L", "stock": 2 },
+      { "size": "XL", "stock": 0 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/modal-column-shirt/800/1000",
+    "productUrl": "https://reistor.in/products/modal-column-shirt"
+  },
+  {
+    "id": "hemp-band-collar-shirt",
+    "title": "Hemp Band Collar Shirt",
+    "occasionTags": ["work"],
+    "category": "tops",
+    "fabric": "hemp",
+    "attributes": "fine hemp twill, band collar, tailored shoulder, olive",
+    "priceINR": 3099,
+    "sizes": [
+      { "size": "XS", "stock": 1 },
+      { "size": "S", "stock": 4 },
+      { "size": "M", "stock": 6 },
+      { "size": "L", "stock": 3 },
+      { "size": "XL", "stock": 1 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-band-collar-shirt/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-band-collar-shirt"
+  },
+  {
+    "id": "linen-midi-dress",
+    "title": "Linen Midi Dress",
+    "occasionTags": ["work"],
+    "category": "dresses",
+    "fabric": "linen",
+    "attributes": "belted linen midi, square neck, side pockets, stone",
+    "priceINR": 4199,
+    "sizes": [
+      { "size": "XS", "stock": 2 },
+      { "size": "S", "stock": 4 },
+      { "size": "M", "stock": 5 },
+      { "size": "L", "stock": 3 },
+      { "size": "XL", "stock": 2 },
+      { "size": "XXL", "stock": 1 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/linen-midi-dress/800/1000",
+    "productUrl": "https://reistor.in/products/linen-midi-dress"
+  },
+  {
+    "id": "hemp-shirt-dress",
+    "title": "Hemp Shirt Dress",
+    "occasionTags": ["work", "casual"],
+    "category": "dresses",
+    "fabric": "hemp",
+    "attributes": "hemp shirt dress, self belt, roll-up sleeve, khaki",
+    "priceINR": 3899,
+    "sizes": [
+      { "size": "XS", "stock": 0 },
+      { "size": "S", "stock": 3 },
+      { "size": "M", "stock": 6 },
+      { "size": "L", "stock": 4 },
+      { "size": "XL", "stock": 2 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-shirt-dress/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-shirt-dress"
+  },
+  {
+    "id": "tencel-slip-dress",
+    "title": "Tencel Slip Dress",
+    "occasionTags": ["dinner", "vacation"],
+    "category": "dresses",
+    "fabric": "Tencel",
+    "attributes": "bias-cut Tencel, cowl neck, adjustable strap, deep plum",
+    "priceINR": 3499,
+    "sizes": [
+      { "size": "XS", "stock": 2 },
+      { "size": "S", "stock": 5 },
+      { "size": "M", "stock": 4 },
+      { "size": "L", "stock": 2 },
+      { "size": "XL", "stock": 1 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/tencel-slip-dress/800/1000",
+    "productUrl": "https://reistor.in/products/tencel-slip-dress"
+  },
+  {
+    "id": "modal-tiered-dress",
+    "title": "Modal Tiered Dress",
+    "occasionTags": ["vacation", "casual"],
+    "category": "dresses",
+    "fabric": "modal",
+    "attributes": "modal tiered maxi, smocked back, tie shoulder, indigo",
+    "priceINR": 3299,
+    "sizes": [
+      { "size": "XS", "stock": 3 },
+      { "size": "S", "stock": 6 },
+      { "size": "M", "stock": 5 },
+      { "size": "L", "stock": 4 },
+      { "size": "XL", "stock": 2 },
+      { "size": "XXL", "stock": 2 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/modal-tiered-dress/800/1000",
+    "productUrl": "https://reistor.in/products/modal-tiered-dress"
+  },
+  {
+    "id": "hemp-a-line-dress",
+    "title": "Hemp A-Line Dress",
+    "occasionTags": ["casual", "vacation"],
+    "category": "dresses",
+    "fabric": "hemp",
+    "attributes": "hemp A-line, patch pockets, cap sleeve, rust",
+    "priceINR": 3599,
+    "sizes": [
+      { "size": "XS", "stock": 1 },
+      { "size": "S", "stock": 3 },
+      { "size": "M", "stock": 3 },
+      { "size": "L", "stock": 5 },
+      { "size": "XL", "stock": 0 },
+      { "size": "XXL", "stock": 1 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-a-line-dress/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-a-line-dress"
+  },
+  {
+    "id": "hemp-wide-trousers",
+    "title": "Hemp Wide Trousers",
+    "occasionTags": ["work", "casual"],
+    "category": "bottoms",
+    "fabric": "hemp",
+    "attributes": "hemp wide leg, pleat front, high rise, black",
+    "priceINR": 3499,
+    "sizes": [
+      { "size": "XS", "stock": 2 },
+      { "size": "S", "stock": 5 },
+      { "size": "M", "stock": 7 },
+      { "size": "L", "stock": 4 },
+      { "size": "XL", "stock": 3 },
+      { "size": "XXL", "stock": 1 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-wide-trousers/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-wide-trousers"
+  },
+  {
+    "id": "linen-pleat-trousers",
+    "title": "Linen Pleat Trousers",
+    "occasionTags": ["work"],
+    "category": "bottoms",
+    "fabric": "linen",
+    "attributes": "linen pleat trouser, tapered ankle, side zip, oat",
+    "priceINR": 3699,
+    "sizes": [
+      { "size": "XS", "stock": 0 },
+      { "size": "S", "stock": 4 },
+      { "size": "M", "stock": 5 },
+      { "size": "L", "stock": 3 },
+      { "size": "XL", "stock": 1 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/linen-pleat-trousers/800/1000",
+    "productUrl": "https://reistor.in/products/linen-pleat-trousers"
+  },
+  {
+    "id": "modal-drawstring-pants",
+    "title": "Modal Drawstring Pants",
+    "occasionTags": ["vacation", "casual"],
+    "category": "bottoms",
+    "fabric": "modal",
+    "attributes": "modal drawstring, elastic back, wide crop, sage",
+    "priceINR": 2699,
+    "sizes": [
+      { "size": "XS", "stock": 3 },
+      { "size": "S", "stock": 5 },
+      { "size": "M", "stock": 6 },
+      { "size": "L", "stock": 5 },
+      { "size": "XL", "stock": 2 },
+      { "size": "XXL", "stock": 2 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/modal-drawstring-pants/800/1000",
+    "productUrl": "https://reistor.in/products/modal-drawstring-pants"
+  },
+  {
+    "id": "hemp-utility-shorts",
+    "title": "Hemp Utility Shorts",
+    "occasionTags": ["vacation", "casual"],
+    "category": "bottoms",
+    "fabric": "hemp",
+    "attributes": "hemp utility short, cargo pocket, mid rise, clay",
+    "priceINR": 2199,
+    "sizes": [
+      { "size": "XS", "stock": 2 },
+      { "size": "S", "stock": 4 },
+      { "size": "M", "stock": 4 },
+      { "size": "L", "stock": 2 },
+      { "size": "XL", "stock": 0 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-utility-shorts/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-utility-shorts"
+  },
+  {
+    "id": "tencel-column-skirt",
+    "title": "Tencel Column Skirt",
+    "occasionTags": ["work"],
+    "category": "bottoms",
+    "fabric": "Tencel",
+    "attributes": "Tencel column skirt, back slit, midi length, navy",
+    "priceINR": 2999,
+    "sizes": [
+      { "size": "XS", "stock": 1 },
+      { "size": "S", "stock": 3 },
+      { "size": "M", "stock": 4 },
+      { "size": "L", "stock": 2 },
+      { "size": "XL", "stock": 1 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/tencel-column-skirt/800/1000",
+    "productUrl": "https://reistor.in/products/tencel-column-skirt"
+  },
+  {
+    "id": "hemp-boiler-jumpsuit",
+    "title": "Hemp Boiler Jumpsuit",
+    "occasionTags": ["work", "casual"],
+    "category": "jumpsuits",
+    "fabric": "hemp",
+    "attributes": "hemp boiler suit, utility pockets, belted waist, forest",
+    "priceINR": 4499,
+    "sizes": [
+      { "size": "XS", "stock": 1 },
+      { "size": "S", "stock": 3 },
+      { "size": "M", "stock": 4 },
+      { "size": "L", "stock": 3 },
+      { "size": "XL", "stock": 2 },
+      { "size": "XXL", "stock": 1 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-boiler-jumpsuit/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-boiler-jumpsuit"
+  },
+  {
+    "id": "linen-strap-jumpsuit",
+    "title": "Linen Strap Jumpsuit",
+    "occasionTags": ["vacation", "dinner"],
+    "category": "jumpsuits",
+    "fabric": "linen",
+    "attributes": "linen strap jumpsuit, wide leg, tie waist, black",
+    "priceINR": 4299,
+    "sizes": [
+      { "size": "XS", "stock": 2 },
+      { "size": "S", "stock": 4 },
+      { "size": "M", "stock": 3 },
+      { "size": "L", "stock": 2 },
+      { "size": "XL", "stock": 1 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/linen-strap-jumpsuit/800/1000",
+    "productUrl": "https://reistor.in/products/linen-strap-jumpsuit"
+  },
+  {
+    "id": "modal-wide-jumpsuit",
+    "title": "Modal Wide Jumpsuit",
+    "occasionTags": ["vacation", "casual"],
+    "category": "jumpsuits",
+    "fabric": "modal",
+    "attributes": "modal wide-leg jumpsuit, kimono sleeve, wrap front, dune",
+    "priceINR": 3999,
+    "sizes": [
+      { "size": "XS", "stock": 0 },
+      { "size": "S", "stock": 3 },
+      { "size": "M", "stock": 5 },
+      { "size": "L", "stock": 3 },
+      { "size": "XL", "stock": 2 },
+      { "size": "XXL", "stock": 1 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/modal-wide-jumpsuit/800/1000",
+    "productUrl": "https://reistor.in/products/modal-wide-jumpsuit"
+  },
+  {
+    "id": "hemp-chore-jacket",
+    "title": "Hemp Chore Jacket",
+    "occasionTags": ["casual", "work"],
+    "category": "jackets",
+    "fabric": "hemp",
+    "attributes": "hemp chore jacket, three-pocket front, unlined, indigo",
+    "priceINR": 4399,
+    "sizes": [
+      { "size": "XS", "stock": 1 },
+      { "size": "S", "stock": 2 },
+      { "size": "M", "stock": 3 },
+      { "size": "L", "stock": 2 },
+      { "size": "XL", "stock": 1 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/hemp-chore-jacket/800/1000",
+    "productUrl": "https://reistor.in/products/hemp-chore-jacket"
+  },
+  {
+    "id": "linen-cropped-jacket",
+    "title": "Linen Cropped Jacket",
+    "occasionTags": ["work"],
+    "category": "jackets",
+    "fabric": "linen",
+    "attributes": "linen cropped jacket, raw hem, single button, ecru — sold out",
+    "priceINR": 4199,
+    "sizes": [
+      { "size": "XS", "stock": 0 },
+      { "size": "S", "stock": 0 },
+      { "size": "M", "stock": 0 },
+      { "size": "L", "stock": 0 },
+      { "size": "XL", "stock": 0 },
+      { "size": "XXL", "stock": 0 }
+    ],
+    "imageUrl": "https://picsum.photos/seed/linen-cropped-jacket/800/1000",
+    "productUrl": "https://reistor.in/products/linen-cropped-jacket"
+  }
+]

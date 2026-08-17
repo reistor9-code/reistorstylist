@@ -1,0 +1,5 @@
+# Copy to `.dev.vars` for `wrangler dev`. Never commit the real file.
+WHATSAPP_TOKEN="EAA..."
+PHONE_NUMBER_ID="123456789012345"
+VERIFY_TOKEN="reistor-stylist-verify"
+ANTHROPIC_API_KEY="sk-ant-..."
