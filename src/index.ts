@@ -27,12 +27,17 @@ export interface Env {
    *  looks render as a product carousel with a real WhatsApp PDP behind each
    *  card; leave it unset and they fall back to image messages. */
   CATALOG_ID?: string;
-  /** Published Flow that collects occasion + category in one message. Unset
-   *  falls back to the approved carousel templates. */
-  FLOW_ID?: string;
-  /** "draft" sends an unpublished Flow — the only way to test while publishing
-   *  is blocked by Meta's integrity check. Unset means published. */
-  FLOW_MODE?: string;
+  /*
+   * Shopify Admin API for the India store, read-only. The domain, numeric shop
+   * id and API version are plain vars in wrangler.toml; only the key and secret
+   * are set with `wrangler secret put`. IND_ prefixed so a second market can be
+   * added later without renaming anything.
+   */
+  IND_SHOPIFY_STORE?: string;
+  IND_SHOPIFY_STORE_ID?: string;
+  IND_SHOPIFY_API_VERSION?: string;
+  IND_SHOPIFY_API_KEY?: string;
+  IND_SHOPIFY_API_SECRET?: string;
   OCCASION_TEMPLATE?: string;
   CATEGORY_TEMPLATE?: string;
   TEMPLATE_LANGUAGE?: string;
@@ -126,7 +131,11 @@ const COPY = {
     'Tell me a little more about the occasion and your usual fit, and I will pull two options.',
   goodbye: 'Thanks for shopping with Reistor. Message anytime for a new look ✨',
   tapAnOption: 'Tap an option below to keep going.',
-  flowBody: 'Two taps and I will pull the rack for you.',
+  // Meta rejects a product message without a body — "(#131009) The parameter
+  // interactive['body'] is required" — so the mandatory line confirms the two
+  // choices back to the shopper rather than being filler. Names and prices are
+  // already on the cards, drawn from the catalog.
+  picksEcho: '{occasion} · {category}',
   // The carousel is the end of the scripted flow, so there is no menu to point
   // at — the cards and the product page behind them are the next step.
   tapACard: 'Tap a card above for the full look. Type "stylist" to ask me anything.',
@@ -165,11 +174,184 @@ export interface Product {
  * live Shopify Admin API query (products + variant inventory, mapped into
  * `Product`) can replace the body without touching any flow logic.
  */
-export async function getProducts(_env: Env): Promise<Product[]> {
-  return catalog as Product[];
+/*
+ * Shopify → Product mapping.
+ *
+ * Built from the live India store, so it accommodates what is actually there
+ * rather than a tidy model: tags differ in case and spacing ("vacation" vs
+ * "Vacation", "Everyday" vs "Every day"), `product_type` is sometimes blank or
+ * the generic "Clothing", and variant titles put the size on either side of the
+ * slash. Everything below is matched case-insensitively and by token.
+ */
+const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+
+/** Shopify tag → occasion id. Conservative: an unmapped tag is simply ignored. */
+const OCCASION_TAGS: Record<string, string> = {
+  weartowork: 'work',
+  'wear to work': 'work',
+  vacation: 'vacation',
+  'holiday collection': 'vacation',
+  everyday: 'casual',
+  'every day': 'casual',
+  'easy everyday': 'casual',
+  always: 'casual',
+  datenight: 'dinner',
+  'date night edit': 'dinner',
+  'noir edits': 'dinner',
+  'that cozy feeling': 'lounge',
+  pajama: 'lounge',
+};
+
+/** product_type or tag → category id. */
+const CATEGORY_TERMS: Record<string, string> = {
+  top: 'tops',
+  tops: 'tops',
+  dress: 'dresses',
+  dresses: 'dresses',
+  pant: 'bottoms',
+  pants: 'bottoms',
+  bottoms: 'bottoms',
+  jacket: 'jackets',
+  jackets: 'jackets',
+  jumpsuit: 'jumpsuits',
+  jumpsuits: 'jumpsuits',
+  romper: 'jumpsuits',
+  'co-ord sets': 'coords',
+  'co-ord set': 'coords',
+  coords: 'coords',
+};
+
+const FABRIC_TERMS = [
+  'hemp',
+  'linen',
+  'tencel',
+  'modal',
+  'organic cotton',
+  'cotton',
+  'bemberg',
+] as const;
+
+interface ShopifyVariant {
+  sku: string;
+  title: string;
+  price: string;
+  inventory_quantity: number;
 }
 
-const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+interface ShopifyProduct {
+  id: number;
+  title: string;
+  handle: string;
+  body_html?: string;
+  product_type: string;
+  tags: string;
+  status: string;
+  variants?: ShopifyVariant[];
+  images?: { src: string }[];
+}
+
+/** Variant titles are "Colour / M" or "M / Colour" — match the size by token. */
+function variantSize(title: string): string | null {
+  for (const part of title.split('/').map((p) => p.trim())) {
+    const hit = SIZE_ORDER.find((s) => s.toLowerCase() === part.toLowerCase());
+    if (hit) return hit;
+  }
+  return null;
+}
+
+function mapShopifyProduct(p: ShopifyProduct): Product | null {
+  const tags = p.tags.split(',').map((t) => norm(t)).filter(Boolean);
+
+  const occasionTags = [...new Set(tags.map((t) => OCCASION_TAGS[t]).filter(Boolean))];
+
+  // product_type first; fall back to tags when it is blank or the catch-all
+  // "Clothing", which covers a large slice of the store.
+  const typeKey = norm(p.product_type);
+  const category =
+    CATEGORY_TERMS[typeKey] ?? tags.map((t) => CATEGORY_TERMS[t]).find(Boolean) ?? null;
+  if (!category) return null;
+
+  const sizes = (p.variants ?? [])
+    .map((v) => ({ size: variantSize(v.title), stock: v.inventory_quantity }))
+    .filter((s): s is SizeStock => Boolean(s.size));
+  if (!sizes.length) return null;
+
+  const fabric = FABRIC_TERMS.find((f) => tags.includes(f)) ?? 'natural fabric';
+  const price = Number(p.variants?.[0]?.price ?? 0);
+
+  return {
+    // The Shopify product id doubles as the catalog retailer_id: stable, unique
+    // and immune to SKU or handle edits.
+    id: String(p.id),
+    title: p.title,
+    occasionTags,
+    category,
+    fabric,
+    attributes: p.product_type || category,
+    priceINR: Math.round(price),
+    sizes,
+    imageUrl: p.images?.[0]?.src ?? '',
+    productUrl: `https://reistor.in/products/${p.handle}`,
+  };
+}
+
+const SHOPIFY_CACHE_KEY = 'shopify:ind:products';
+
+/**
+ * The only catalog seam in this Worker. Reads the live Shopify store when it is
+ * configured, falling back to the bundled mock otherwise.
+ *
+ * Results are cached in KV for ten minutes — getProducts() is called several
+ * times per inbound message, and paging the whole store each time would add
+ * seconds to every reply.
+ */
+export async function getProducts(env: Env): Promise<Product[]> {
+  if (!env.IND_SHOPIFY_STORE || !env.IND_SHOPIFY_API_SECRET) return catalog as Product[];
+
+  const cached = await env.STATE.get(SHOPIFY_CACHE_KEY);
+  if (cached) return JSON.parse(cached) as Product[];
+
+  const mapped: Product[] = [];
+  let skipped = 0;
+  let pageInfo: string | null = null;
+
+  // Cap the paging: a runaway loop against a large store would blow the CPU
+  // budget, and 1000 products is far more than the flow ever surfaces.
+  for (let page = 0; page < 4; page++) {
+    const query: string = pageInfo
+      ? `products.json?limit=250&page_info=${pageInfo}`
+      : 'products.json?limit=250&status=active';
+
+    const res: Response = await shopifyFetch(env, query);
+    if (!res.ok) {
+      console.log('[shopify:list-error]', res.status, (await res.text()).slice(0, 200));
+      break;
+    }
+
+    const body = (await res.json()) as { products?: ShopifyProduct[] };
+    for (const p of body.products ?? []) {
+      const product = mapShopifyProduct(p);
+      if (product) mapped.push(product);
+      else skipped++;
+    }
+
+    const link = res.headers.get('link') ?? '';
+    const next = /<[^>]*[?&]page_info=([^&>]+)[^>]*>;\s*rel="next"/.exec(link);
+    if (!next) break;
+    pageInfo = next[1];
+  }
+
+  if (!mapped.length) {
+    console.log('[shopify:empty] falling back to the bundled catalog');
+    return catalog as Product[];
+  }
+
+  console.log('[shopify:loaded]', `mapped=${mapped.length}`, `skipped=${skipped}`);
+  await env.STATE.put(SHOPIFY_CACHE_KEY, JSON.stringify(mapped), { expirationTtl: 600 });
+  return mapped;
+}
+
+const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', '5XL'];
 
 /*
  * `image` and `blurb` are only used by the carousel pickers — swap the images
@@ -187,35 +369,35 @@ const OCCASIONS = [
     label: 'Work & Meeting',
     phrase: 'long meeting days',
     blurb: 'Tailored hemp and linen shirting, cut for long days of back-to-back meetings.',
-    image: 'https://picsum.photos/seed/occ-work/800/800',
+    image: 'https://picsum.photos/seed/occ-work/1080/1080',
   },
   {
     id: 'vacation',
     label: 'Vacation & Travel',
     phrase: 'packing light',
     blurb: 'Breathable modal and Tencel pieces that pack flat and travel well.',
-    image: 'https://picsum.photos/seed/occ-vacation/800/800',
+    image: 'https://picsum.photos/seed/occ-vacation/1080/1080',
   },
   {
     id: 'casual',
     label: 'Casual & Brunch',
     phrase: 'slow weekend plans',
     blurb: 'Relaxed shapes in hemp and cotton for slow weekend plans.',
-    image: 'https://picsum.photos/seed/occ-casual/800/800',
+    image: 'https://picsum.photos/seed/occ-casual/1080/1080',
   },
   {
     id: 'dinner',
     label: 'Dinner Date',
     phrase: 'evening plans',
     blurb: 'Bias-cut Tencel and linen with a quiet shine for evening plans.',
-    image: 'https://picsum.photos/seed/occ-dinner/800/800',
+    image: 'https://picsum.photos/seed/occ-dinner/1080/1080',
   },
   {
     id: 'lounge',
     label: 'Loungewear',
     phrase: 'quiet days at home',
     blurb: 'Soft modal and cotton made for quiet days spent at home.',
-    image: 'https://picsum.photos/seed/occ-lounge/800/800',
+    image: 'https://picsum.photos/seed/occ-lounge/1080/1080',
   },
 ] as const;
 
@@ -224,37 +406,37 @@ const CATEGORIES = [
     id: 'tops',
     label: 'Tops',
     blurb: 'Shirts, blouses and tees in hemp, linen and modal for every day.',
-    image: 'https://picsum.photos/seed/cat-tops/800/800',
+    image: 'https://picsum.photos/seed/cat-tops/1080/1080',
   },
   {
     id: 'dresses',
     label: 'Dresses',
     blurb: 'Midi, slip and shirt dresses that carry from day into evening.',
-    image: 'https://picsum.photos/seed/cat-dresses/800/800',
+    image: 'https://picsum.photos/seed/cat-dresses/1080/1080',
   },
   {
     id: 'bottoms',
     label: 'Bottoms',
     blurb: 'Trousers, shorts and skirts with a high rise and a roomy leg.',
-    image: 'https://picsum.photos/seed/cat-bottoms/800/800',
+    image: 'https://picsum.photos/seed/cat-bottoms/1080/1080',
   },
   {
     id: 'jackets',
     label: 'Jackets',
     blurb: 'Unlined hemp layers that sit over almost everything else.',
-    image: 'https://picsum.photos/seed/cat-jackets/800/800',
+    image: 'https://picsum.photos/seed/cat-jackets/1080/1080',
   },
   {
     id: 'jumpsuits',
     label: 'Jumpsuits',
     blurb: 'One-piece dressing in hemp, linen and modal, belted or loose.',
-    image: 'https://picsum.photos/seed/cat-jumpsuits/800/800',
+    image: 'https://picsum.photos/seed/cat-jumpsuits/1080/1080',
   },
   {
     id: 'coords',
     label: 'Co-ord Sets',
     blurb: 'Matched tops and bottoms designed to be worn together.',
-    image: 'https://picsum.photos/seed/cat-coords/800/800',
+    image: 'https://picsum.photos/seed/cat-coords/1080/1080',
   },
 ] as const;
 
@@ -538,38 +720,6 @@ async function sendSingleProduct(
   });
 }
 
-/**
- * Opens the picker Flow. One message collects both occasion and category, and
- * the answers come back as a single `nfm_reply` — see parseInbound().
- *
- * Free-form, so unlike the carousel templates this is unbilled inside the
- * 24-hour window.
- */
-async function sendFlow(env: Env, to: string, flowToken: string): Promise<boolean> {
-  if (!env.FLOW_ID) return false;
-
-  return graph(env, {
-    to,
-    type: 'interactive',
-    interactive: {
-      type: 'flow',
-      body: { text: COPY.flowBody },
-      action: {
-        name: 'flow',
-        parameters: {
-          flow_message_version: '3',
-          flow_token: flowToken,
-          flow_id: env.FLOW_ID,
-          flow_cta: 'Start styling',
-          ...(env.FLOW_MODE ? { mode: env.FLOW_MODE } : {}),
-          flow_action: 'navigate',
-          flow_action_payload: { screen: 'occasion_select' },
-        },
-      },
-    },
-  });
-}
-
 /** Falls back to a text message if Meta cannot fetch the image URL. */
 async function sendImage(env: Env, to: string, imageUrl: string, caption: string): Promise<boolean> {
   const ok = await graph(env, {
@@ -802,11 +952,6 @@ async function askOccasion(env: Env, to: string, state: State): Promise<void> {
   state.step = 'occasion';
   state.mode = 'flow';
 
-  // Preferred: one Flow message covering both picks. Falls back to the two
-  // approved carousel templates when FLOW_ID is unset or the send is rejected.
-  if (await sendFlow(env, to, `stylist:${to}`)) return;
-  if (env.FLOW_ID) console.log('[flow:rejected] falling back to carousel templates');
-
   const sent = await sendCarouselTemplate(
     env,
     to,
@@ -866,15 +1011,27 @@ async function sendLooks(
       state.reasons[product.id] ?? lookReason(product, state.occasion)
     }`;
 
-  // Preferred path: a product message, so every look has a real PDP behind it.
-  // Carousel for two or more, single product message for exactly one — Meta
-  // rejects a carousel with fewer than two cards. The per-look reasons ride in
-  // the body, since card content is drawn from the catalog and cannot be
-  // overridden per send.
-  const body = [lead, ...products.map(caption)].filter(Boolean).join('\n\n');
+  /*
+   * Preferred path: a product message, so every look has a real PDP behind it.
+   * Carousel for two or more, single product message for exactly one — Meta
+   * rejects a carousel with fewer than two cards.
+   *
+   * The body is mandatory — a bodyless send is refused with "(#131009) The
+   * parameter interactive['body'] is required" — so rather than filler it
+   * echoes the shopper's two choices back. A widened brief replaces it, since
+   * explaining the swap matters more than confirming the pick.
+   */
+  const body =
+    lead ??
+    fill(COPY.picksEcho, {
+      occasion: occasionLabel(state.occasion),
+      category: categoryLabel(state.category),
+    });
+
+  const ids = products.map((p) => p.id);
   const sentAsProduct =
     products.length >= 2
-      ? await sendProductCarousel(env, to, body, products.map((p) => p.id))
+      ? await sendProductCarousel(env, to, body, ids)
       : products.length === 1
         ? await sendSingleProduct(env, to, body, products[0].id)
         : false;
@@ -1184,8 +1341,6 @@ interface Inbound {
   messageId: string;
   text?: string;
   replyId?: string;
-  /** Set when a Flow completed — both picker answers arrive at once. */
-  flowAnswers?: { occasion?: string; category?: string };
 }
 
 const STYLIST_OPENERS: Record<string, string> = {
@@ -1199,9 +1354,7 @@ async function route(env: Env, msg: Inbound): Promise<void> {
   const state = await loadState(env, to);
 
   try {
-    if (msg.flowAnswers) {
-      await handleFlowAnswers(env, to, state, msg.flowAnswers);
-    } else if (msg.replyId) {
+    if (msg.replyId) {
       await handleReply(env, to, state, msg.replyId);
     } else if (msg.text !== undefined) {
       await handleText(env, to, state, msg.text);
@@ -1209,36 +1362,6 @@ async function route(env: Env, msg: Inbound): Promise<void> {
   } finally {
     await saveState(env, to, state);
   }
-}
-
-/**
- * A completed picker Flow: both answers at once, so this goes straight to the
- * product carousel. A Flow dismissed early can arrive with either field empty,
- * in which case fall back to asking for whichever half is missing.
- */
-async function handleFlowAnswers(
-  env: Env,
-  to: string,
-  state: State,
-  answers: { occasion?: string; category?: string },
-): Promise<void> {
-  const occasion = OCCASIONS.find((o) => o.id === answers.occasion);
-  const category = CATEGORIES.find((c) => c.id === answers.category);
-
-  state.mode = 'flow';
-  if (occasion) state.occasion = occasion.id;
-  if (category) state.category = category.id;
-
-  if (!occasion) {
-    await askOccasion(env, to, state);
-    return;
-  }
-  if (!category) {
-    await askCategory(env, to, state);
-    return;
-  }
-
-  await runBackend(env, to, state);
 }
 
 async function handleReply(env: Env, to: string, state: State, replyId: string): Promise<void> {
@@ -1510,13 +1633,48 @@ async function graphCall(
  * what the batch endpoint expects. `availability` is derived from real stock so
  * a sold-out piece cannot be added to a cart.
  */
-async function createCatalogItems(
+/** Every retailer_id currently in the catalog, paged out. */
+async function existingRetailerIds(env: Env, catalogId: string): Promise<Set<string>> {
+  const ids = new Set<string>();
+  let path: string | null = `${catalogId}/products?fields=retailer_id&limit=250`;
+
+  for (let page = 0; page < 10 && path; page++) {
+    const res: { status: number; body: unknown } = await graphCall(env, path);
+    const body = res.body as {
+      data?: { retailer_id: string }[];
+      paging?: { next?: string; cursors?: { after?: string } };
+    };
+    for (const item of body?.data ?? []) ids.add(item.retailer_id);
+
+    const after = body?.paging?.cursors?.after;
+    path = body?.paging?.next && after
+      ? `${catalogId}/products?fields=retailer_id&limit=250&after=${after}`
+      : null;
+  }
+
+  return ids;
+}
+
+/**
+ * Reconciles the catalog with the live product set.
+ *
+ * CREATE for new items, UPDATE for ones already there, DELETE for anything left
+ * over — which is what clears the original mock rows once real products arrive.
+ * Out-of-stock products are uploaded too, marked `out of stock`: the flow hides
+ * them, but a PDP opened from an older message still resolves.
+ *
+ * Batches are chunked because Meta rejects oversized request arrays.
+ */
+async function syncCatalogItems(
   env: Env,
   catalogId: string,
   products: Product[],
-): Promise<{ status: number; body: unknown }> {
-  const requests = products.map((p) => ({
-    method: 'CREATE',
+): Promise<Record<string, unknown>> {
+  const existing = await existingRetailerIds(env, catalogId);
+  const live = new Set(products.map((p) => p.id));
+
+  const upserts = products.map((p) => ({
+    method: existing.has(p.id) ? 'UPDATE' : 'CREATE',
     retailer_id: p.id,
     data: {
       name: p.title,
@@ -1531,7 +1689,28 @@ async function createCatalogItems(
     },
   }));
 
-  return graphCall(env, `${catalogId}/batch`, { method: 'POST', body: { requests } });
+  const stale = [...existing].filter((id) => !live.has(id));
+  const requests = [
+    ...upserts,
+    ...stale.map((retailer_id) => ({ method: 'DELETE', retailer_id })),
+  ];
+
+  const batches: { status: number; body: unknown }[] = [];
+  for (let i = 0; i < requests.length; i += 100) {
+    batches.push(
+      await graphCall(env, `${catalogId}/batch`, {
+        method: 'POST',
+        body: { requests: requests.slice(i, i + 100) },
+      }),
+    );
+  }
+
+  return {
+    created: upserts.filter((r) => r.method === 'CREATE').length,
+    updated: upserts.filter((r) => r.method === 'UPDATE').length,
+    deleted: stale.length,
+    batches: batches.map((b) => ({ status: b.status, body: b.body })),
+  };
 }
 
 /**
@@ -1575,185 +1754,255 @@ async function provisionCatalog(
     body: { catalog_id: catalogId },
   });
 
-  const products = (await getProducts(env)).filter(isInStock);
-  steps.items = await createCatalogItems(env, catalogId, products);
+  const products = await getProducts(env);
+  steps.items = await syncCatalogItems(env, catalogId, products);
   steps.itemCount = products.length;
   steps.next = `Set CATALOG_ID = "${catalogId}" in wrangler.toml, then redeploy.`;
 
   return steps;
 }
 
-/* ------------------------------------------------------------------ *
- * Picker Flow provisioning (one-off, via /admin/flow)
+/**
+ * Read-only sample of the Shopify catalog.
  *
- * Two screens of tappable image rows. WhatsApp Flows have exactly one layout,
- * SingleColumnLayout — there is no grid, so these render as a vertical list of
- * cards rather than a 2-across grid.
+ * Returns the fields getProducts() will map — tags, product_type, variants and
+ * inventory — so the occasion mapping is written against the real data rather
+ * than assumed. Touches nothing: a GET with read_products.
+ */
+const SHOPIFY_TOKEN_KEY = 'shopify:ind:token';
+/** Re-mint this far before the token actually dies, so no request races expiry. */
+const SHOPIFY_TOKEN_MARGIN_S = 3 * 3600;
+
+const shopifyHost = (env: Env) =>
+  (env.IND_SHOPIFY_STORE ?? '').replace(/^https?:\/\//, '').replace(/\/$/, '');
+
+/**
+ * Returns a usable Shopify access token, minting a new one when needed.
  *
- * Screen 1 navigates to screen 2 carrying the occasion; screen 2 completes and
- * returns both answers. Completing rather than exchanging data is what keeps
- * this endpoint-free: no Flow endpoint, no RSA keypair.
- * ------------------------------------------------------------------ */
+ * A key/secret pair mints a `client_credentials` token that Shopify expires in
+ * about 24 hours. Rather than a scheduled refresh — which can still hand out a
+ * dead token if the timing drifts — the token is cached in KV with a TTL three
+ * hours short of its real expiry and re-minted on the first request after that.
+ * Workers are stateless, so an in-process cache would not survive isolate
+ * recycling; KV is the only durable option here.
+ *
+ * A permanent custom-app token (`shpat_…`) is used as-is and never minted.
+ */
+async function shopifyAccessToken(env: Env, force = false): Promise<string | null> {
+  const secret = env.IND_SHOPIFY_API_SECRET ?? '';
+  /*
+   * Only `shpat_` (Admin API access token) and `shpca_` (legacy custom app)
+   * authenticate API calls. `shpss_` sits next to them on the same Shopify
+   * page but is the app's secret key — for OAuth and webhook signing — and
+   * sending it yields "Invalid API key or access token".
+   */
+  if (/^shp(at|ca)_/.test(secret)) return secret;
+  if (!env.IND_SHOPIFY_API_KEY || !secret) return null;
 
-/** NavigationList images are base64 inline only, and are dropped above 100KB. */
-async function imageBase64(url: string): Promise<string> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`could not fetch ${url}: ${res.status}`);
-  const bytes = new Uint8Array(await res.arrayBuffer());
-
-  let binary = '';
-  for (const byte of bytes) binary += String.fromCharCode(byte);
-  const encoded = btoa(binary);
-
-  if (encoded.length > 100_000) {
-    console.log('[flow:image-too-large]', url, encoded.length);
+  if (!force) {
+    const cached = await env.STATE.get(SHOPIFY_TOKEN_KEY);
+    if (cached) return cached;
   }
-  return encoded;
-}
 
-function flowJson(
-  occasionImages: string[],
-  categoryImages: string[],
-): Record<string, unknown> {
-  const item = (
-    id: string,
-    title: string,
-    description: string,
-    image: string,
-    action: Record<string, unknown>,
-  ) => ({
-    id,
-    'main-content': { title, description },
-    start: { image, 'alt-text': title },
-    'on-click-action': action,
+  const res = await fetch(`https://${shopifyHost(env)}/admin/oauth/access_token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_id: env.IND_SHOPIFY_API_KEY,
+      client_secret: secret,
+      grant_type: 'client_credentials',
+    }),
   });
 
+  const text = await res.text();
+  if (!res.ok) {
+    console.log('[shopify:token-error]', res.status, text.slice(0, 300));
+    return null;
+  }
+
+  const body = JSON.parse(text) as { access_token?: string; expires_in?: number };
+  if (!body.access_token) {
+    console.log('[shopify:token-missing]', text.slice(0, 300));
+    return null;
+  }
+
+  // KV needs at least 60s; expires_in is seconds and typically ~86400.
+  const ttl = Math.max(60, (body.expires_in ?? 86_400) - SHOPIFY_TOKEN_MARGIN_S);
+  await env.STATE.put(SHOPIFY_TOKEN_KEY, body.access_token, { expirationTtl: ttl });
+  console.log('[shopify:token-minted]', `expires_in=${body.expires_in}`, `cached_for=${ttl}s`);
+
+  return body.access_token;
+}
+
+/**
+ * One Shopify Admin API call. Retries once on 401 with a freshly minted token,
+ * which covers a token revoked or expired earlier than its stated lifetime.
+ */
+async function shopifyFetch(env: Env, path: string): Promise<Response> {
+  const url = `https://${shopifyHost(env)}/admin/api/${env.IND_SHOPIFY_API_VERSION || '2026-04'}/${path}`;
+
+  const call = async (token: string) =>
+    fetch(url, {
+      headers: { 'X-Shopify-Access-Token': token, 'Content-Type': 'application/json' },
+    });
+
+  const token = await shopifyAccessToken(env);
+  if (!token) return new Response('{"errors":"no Shopify token available"}', { status: 401 });
+
+  const res = await call(token);
+  if (res.status !== 401) return res;
+
+  console.log('[shopify:401] re-minting token and retrying');
+  const fresh = await shopifyAccessToken(env, true);
+  return fresh ? call(fresh) : res;
+}
+
+async function sampleShopify(env: Env, limit: number): Promise<Record<string, unknown>> {
+  const missing = (
+    ['IND_SHOPIFY_STORE', 'IND_SHOPIFY_API_KEY', 'IND_SHOPIFY_API_SECRET'] as const
+  ).filter((k) => !env[k]);
+  if (missing.length) return { error: `Not configured: ${missing.join(', ')}` };
+
+  // status=active mirrors what shoppers may actually be shown; inventory_* is
+  // needed to tell "sold out" from "inventory simply not tracked".
+  const query =
+    `products.json?limit=${limit}&status=active` +
+    `&fields=id,title,handle,product_type,tags,status,variants,images`;
+  const res = await shopifyFetch(env, query);
+  const text = await res.text();
+  if (!res.ok) {
+    // Prefix and length only — enough to tell shpat_ from shpss_ or a truncated
+    // paste, without putting the credential itself in a response.
+    const secret = env.IND_SHOPIFY_API_SECRET ?? '';
+    const key = env.IND_SHOPIFY_API_KEY ?? '';
+
+    /*
+     * Separate "bad token" from "bad API version" from "wrong store". shop.json
+     * is the cheapest authenticated call; running it across versions shows
+     * whether only the configured version fails. An unauthenticated call proves
+     * the domain resolves to a real Shopify store at all.
+     */
+    const host = shopifyHost(env);
+    const probe = async (label: string, url: string, auth: boolean) => {
+      const r = await fetch(url, {
+        headers: auth ? { 'X-Shopify-Access-Token': secret } : {},
+      });
+      const b = await r.text();
+      return { [label]: { status: r.status, body: b.slice(0, 160) } };
+    };
+
+    const probes = Object.assign(
+      {},
+      await probe('shopJson_configuredVersion', `https://${host}/admin/api/${env.IND_SHOPIFY_API_VERSION}/shop.json`, true),
+      await probe('shopJson_2025_10', `https://${host}/admin/api/2025-10/shop.json`, true),
+      await probe('storefrontReachable_noAuth', `https://${host}/admin/api/2025-10/shop.json`, false),
+    );
+
+    return {
+      status: res.status,
+      store: env.IND_SHOPIFY_STORE,
+      apiVersion: env.IND_SHOPIFY_API_VERSION,
+      credentials: {
+        secretPrefix: secret.slice(0, 6),
+        secretLength: secret.length,
+        secretHasWhitespace: secret !== secret.trim(),
+        keyPrefix: key.slice(0, 6),
+        keyLength: key.length,
+      },
+      probes,
+      body: text.slice(0, 500),
+    };
+  }
+
+  const parsed = JSON.parse(text) as {
+    products?: {
+      id: number;
+      title: string;
+      product_type: string;
+      tags: string;
+      status: string;
+      variants?: {
+        id: number;
+        sku: string;
+        title: string;
+        price: string;
+        inventory_quantity: number;
+        inventory_management: string | null;
+        inventory_policy: string;
+      }[];
+      images?: { src: string }[];
+    }[];
+  };
+
+  const products = (parsed.products ?? []).map((p) => ({
+    id: p.id,
+    title: p.title,
+    product_type: p.product_type,
+    status: p.status,
+    tags: p.tags.split(',').map((t) => t.trim()).filter(Boolean),
+    firstImage: p.images?.[0]?.src,
+    variants: (p.variants ?? []).map((v) => ({
+      sku: v.sku,
+      size: v.title,
+      price: v.price,
+      stock: v.inventory_quantity,
+      tracked: v.inventory_management,
+      whenOutOfStock: v.inventory_policy,
+    })),
+  }));
+
+  // The tag vocabulary is what the occasion mapping has to be built against.
+  const allTags = [...new Set(products.flatMap((p) => p.tags))].sort();
+  const skusMissing = products.filter((p) => p.variants.some((v) => !v.sku)).length;
+  const allVariants = products.flatMap((p) => p.variants);
+  const inventory = {
+    variants: allVariants.length,
+    withStock: allVariants.filter((v) => v.stock > 0).length,
+    tracked: allVariants.filter((v) => v.tracked).length,
+    continueSellingWhenOut: allVariants.filter((v) => v.whenOutOfStock === 'continue').length,
+  };
+  const productTypes = [...new Set(products.map((p) => p.product_type))].sort();
+
   return {
-    version: '7.3',
-    routing_model: { occasion_select: ['category_select'], category_select: [] },
-    screens: [
-      {
-        id: 'occasion_select',
-        title: "What's the occasion?",
-        terminal: false,
-        layout: {
-          type: 'SingleColumnLayout',
-          children: [
-            {
-              type: 'NavigationList',
-              name: 'occasion_nav',
-              'list-items': OCCASIONS.map((o, i) =>
-                item(o.id, o.label, o.blurb, occasionImages[i], {
-                  name: 'navigate',
-                  next: { type: 'screen', name: 'category_select' },
-                  payload: { occasion: o.id },
-                }),
-              ),
-            },
-          ],
-        },
-      },
-      /*
-       * RadioButtonsGroup rather than a second NavigationList: a NavigationList
-       * item may only "navigate" or "data_exchange" — Meta rejects "complete"
-       * on it. Completing here is what avoids needing a Flow endpoint, so the
-       * final screen is a radio group plus a Footer that completes.
-       */
-      {
-        id: 'category_select',
-        title: 'What are we shopping?',
-        terminal: true,
-        success: true,
-        data: { occasion: { type: 'string', __example__: 'work' } },
-        layout: {
-          type: 'SingleColumnLayout',
-          children: [
-            {
-              type: 'Form',
-              name: 'category_form',
-              children: [
-                {
-                  type: 'RadioButtonsGroup',
-                  name: 'category',
-                  label: 'Pick a category',
-                  required: true,
-                  'data-source': CATEGORIES.map((c, i) => ({
-                    id: c.id,
-                    title: c.label,
-                    description: c.blurb,
-                    image: categoryImages[i],
-                  })),
-                },
-                {
-                  type: 'Footer',
-                  label: 'Show my looks',
-                  'on-click-action': {
-                    name: 'complete',
-                    payload: { occasion: '${data.occasion}', category: '${form.category}' },
-                  },
-                },
-              ],
-            },
-          ],
-        },
-      },
-    ],
+    store: env.IND_SHOPIFY_STORE,
+    storeId: env.IND_SHOPIFY_STORE_ID,
+    apiVersion: env.IND_SHOPIFY_API_VERSION,
+    count: products.length,
+    allTags,
+    productTypes,
+    inventory,
+    productsWithBlankSkus: skusMissing,
+    products,
   };
 }
 
 /**
- * Creates the Flow, uploads the JSON asset and publishes it.
+ * Read-only survey of the commerce catalogs on a business.
  *
- * `name` must be unique across the WABA — Meta rejects a repeat with
- * "Flow name is not unique" — so re-running needs a fresh one. Pass `existing`
- * to skip creation and re-upload onto a Flow that already exists.
+ * Lists every catalog with its product count and samples a few items from
+ * each, so the Shopify-synced one can be identified and its `retailer_id`
+ * format read off. Writes nothing — deliberately, since the live catalog and
+ * Business Manager must not be disturbed.
  */
-async function provisionFlow(
-  env: Env,
-  waba: string,
-  name: string,
-  existing?: string,
-): Promise<Record<string, unknown>> {
-  const steps: Record<string, unknown> = {};
-  const version = env.GRAPH_API_VERSION || 'v25.0';
+async function surveyCatalogs(env: Env, business: string): Promise<Record<string, unknown>> {
+  const listed = await graphCall(
+    env,
+    `${business}/owned_product_catalogs?fields=id,name,product_count,vertical&limit=25`,
+  );
 
-  // Smaller renders keep each base64 image under the 100KB ceiling.
-  const small = (url: string) => url.replace('/800/800', '/400/400');
-  const occasionImages = await Promise.all(OCCASIONS.map((o) => imageBase64(small(o.image))));
-  const categoryImages = await Promise.all(CATEGORIES.map((c) => imageBase64(small(c.image))));
-  steps.imageBytes = [...occasionImages, ...categoryImages].map((b) => b.length);
+  const catalogs = (listed.body as { data?: { id: string; name: string }[] })?.data ?? [];
 
-  let flowId = existing;
-  if (flowId) {
-    steps.create = 'skipped — existing flow id supplied';
-  } else {
-    const created = await graphCall(env, `${waba}/flows`, {
-      method: 'POST',
-      body: { name, categories: ['OTHER'] },
-    });
-    steps.create = created;
-    flowId = (created.body as { id?: string })?.id;
-  }
-  if (!flowId) return steps;
-  steps.flowId = flowId;
+  const sampled = await Promise.all(
+    catalogs.map(async (c) => {
+      const items = await graphCall(
+        env,
+        `${c.id}/products?fields=retailer_id,name,price,availability&limit=3`,
+      );
+      return { ...c, sample: (items.body as { data?: unknown[] })?.data ?? items.body };
+    }),
+  );
 
-  const json = flowJson(occasionImages, categoryImages);
-  const form = new FormData();
-  form.append('name', 'flow.json');
-  form.append('asset_type', 'FLOW_JSON');
-  form.append('file', new Blob([JSON.stringify(json)], { type: 'application/json' }), 'flow.json');
-
-  const upload = await fetch(`https://graph.facebook.com/${version}/${flowId}/assets`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${env.WHATSAPP_TOKEN}` },
-    body: form,
-  });
-  steps.upload = { status: upload.status, body: await upload.text() };
-
-  steps.publish = await graphCall(env, `${flowId}/publish`, { method: 'POST' });
-  steps.next = `Set FLOW_ID = "${flowId}" in wrangler.toml, then redeploy.`;
-
-  return steps;
+  return { business, catalogs: sampled };
 }
 
 /**
@@ -1767,19 +2016,50 @@ async function diagnoseProducts(
   env: Env,
   to: string,
   ids: string[],
+  omitBody = false,
+  waba?: string,
 ): Promise<Record<string, unknown>> {
   if (!env.CATALOG_ID) return { error: 'CATALOG_ID is not set on the Worker' };
 
-  const items = await graphCall(
-    env,
-    `${env.CATALOG_ID}/products?fields=retailer_id,name,availability,price&limit=5`,
+  /*
+   * Which catalog this WABA is actually bound to. A catalog links to exactly
+   * one WABA, and sending from any other returns "product not found" even
+   * though the item plainly exists — indistinguishable from a missing item
+   * unless you check the binding directly.
+   */
+  const linkedCatalogs = waba
+    ? (await graphCall(env, `${waba}/product_catalogs?fields=id,name,product_count`)).body
+    : 'pass &waba=<WABA_ID> to check the catalog binding';
+
+  // How big the catalog actually is, and whether each id being sent is really
+  // in it. A card fails identically whether the item was never created or is
+  // still being indexed, so look it up directly rather than infer.
+  const size = await graphCall(env, `${env.CATALOG_ID}?fields=product_count,name`);
+  // Commerce settings for this phone number: whether the catalog is visible to
+  // shoppers at all. A hidden catalog makes every product message fail.
+  const commerce = await graphCall(env, `${env.PHONE_NUMBER_ID}/whatsapp_commerce_settings`);
+  const lookups = await Promise.all(
+    ids.map(async (retailerId) => {
+      const filter = encodeURIComponent(JSON.stringify({ retailer_id: { eq: retailerId } }));
+      /*
+       * visibility and review_status are the two reasons an item can sit in a
+       * catalog and still be unsendable: `staging` hides it, and a review that
+       * is pending or rejected keeps it out of WhatsApp entirely.
+       */
+      const found = await graphCall(
+        env,
+        `${env.CATALOG_ID}/products?fields=retailer_id,name,availability,visibility,review_status,image_url&filter=${filter}`,
+      );
+      const rows = (found.body as { data?: unknown[] })?.data ?? [];
+      return { retailerId, inCatalog: rows.length > 0, row: rows[0] ?? null };
+    }),
   );
 
   const interactive =
     ids.length >= 2
       ? {
           type: 'carousel',
-          body: { text: 'Catalog test' },
+          ...(omitBody ? {} : { body: { text: 'Catalog test' } }),
           action: {
             cards: ids.slice(0, 10).map((retailerId, index) => ({
               card_index: index,
@@ -1799,7 +2079,15 @@ async function diagnoseProducts(
     body: { messaging_product: 'whatsapp', recipient_type: 'individual', to, type: 'interactive', interactive },
   });
 
-  return { catalogId: env.CATALOG_ID, sentIds: ids, items, send };
+  return {
+    catalogId: env.CATALOG_ID,
+    catalogSize: size.body,
+    linkedCatalogs,
+    commerceSettings: commerce.body,
+    sentIds: ids,
+    lookups,
+    send,
+  };
 }
 
 async function createTemplate(
@@ -1967,30 +2255,6 @@ function parseInbound(body: any): Inbound | null {
   }
 
   if (message.type === 'interactive') {
-    /*
-     * A completed Flow arrives as nfm_reply, with every answer packed into a
-     * JSON string. The picker Flow completes on the category tap, so occasion
-     * and category land together in one inbound message.
-     */
-    const flowJsonText = message.interactive?.nfm_reply?.response_json;
-    if (flowJsonText) {
-      try {
-        const answers = JSON.parse(String(flowJsonText)) as Record<string, unknown>;
-        console.log('[inbound:flow]', flowJsonText);
-        return {
-          waId,
-          messageId,
-          flowAnswers: {
-            occasion: answers.occasion ? String(answers.occasion) : undefined,
-            category: answers.category ? String(answers.category) : undefined,
-          },
-        };
-      } catch (err) {
-        console.log('[inbound:flow-parse-error]', String(err), flowJsonText);
-        return { waId, messageId, text: '' };
-      }
-    }
-
     const replyId =
       message.interactive?.list_reply?.id ?? message.interactive?.button_reply?.id ?? undefined;
     if (replyId) return { waId, messageId, replyId: String(replyId) };
@@ -2177,7 +2441,13 @@ export default {
         return new Response('Missing ?to=<WA_ID>&ids=<id1,id2>', { status: 400 });
       }
 
-      const result = await diagnoseProducts(env, to, ids);
+      const result = await diagnoseProducts(
+        env,
+        to,
+        ids,
+        url.searchParams.get('nobody') === '1',
+        url.searchParams.get('waba') ?? undefined,
+      );
       console.log('[admin:testproduct]', JSON.stringify(result));
       return new Response(JSON.stringify(result, null, 2), {
         status: 200,
@@ -2218,36 +2488,81 @@ export default {
     }
 
     /*
-     * Creates, uploads and publishes the two-screen picker Flow.
+     * Coverage of the mapped catalog: how many in-stock products land in each
+     * occasion x category cell, which is what decides whether the flow has
+     * anything to show.
      *
-     *   /admin/flow?token=<VERIFY_TOKEN>&waba=<WABA_ID>
+     *   /admin/mapped?token=<VERIFY_TOKEN>[&fresh=1]
      */
-    if (path === '/admin/flow' && request.method === 'GET') {
+    if (path === '/admin/mapped' && request.method === 'GET') {
       if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
         return new Response('Forbidden', { status: 403 });
       }
-      const waba = url.searchParams.get('waba');
-      if (!waba) return new Response('Missing ?waba=<WABA_ID>', { status: 400 });
+      if (url.searchParams.get('fresh') === '1') await env.STATE.delete(SHOPIFY_CACHE_KEY);
 
-      try {
-        const result = await provisionFlow(
-          env,
-          waba,
-          url.searchParams.get('name') ?? 'Fashion_Stylist_V1',
-          url.searchParams.get('flow') ?? undefined,
-        );
-        console.log('[admin:flow]', JSON.stringify(result));
-        return new Response(JSON.stringify(result, null, 2), {
-          status: 200,
-          headers: { 'content-type': 'application/json' },
-        });
-      } catch (err) {
-        console.log('[admin:flow-error]', String(err));
-        return new Response(JSON.stringify({ error: String(err) }, null, 2), {
-          status: 500,
-          headers: { 'content-type': 'application/json' },
-        });
+      const all = await getProducts(env);
+      const inStock = all.filter(isInStock);
+
+      const grid: Record<string, Record<string, number>> = {};
+      for (const o of OCCASIONS) {
+        grid[o.label] = {};
+        for (const c of CATEGORIES) {
+          grid[o.label][c.label] = filterProducts(inStock, o.id, c.id).length;
+        }
       }
+
+      return new Response(
+        JSON.stringify(
+          {
+            total: all.length,
+            inStock: inStock.length,
+            withNoOccasion: inStock.filter((p) => !p.occasionTags.length).length,
+            byCategory: Object.fromEntries(
+              CATEGORIES.map((c) => [c.label, filterProducts(inStock, undefined, c.id).length]),
+            ),
+            grid,
+            sample: inStock.slice(0, 3),
+          },
+          null,
+          2,
+        ),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+
+    /*
+     * Read-only sample of Shopify products, to build the mapping against.
+     *
+     *   /admin/shopify?token=<VERIFY_TOKEN>[&limit=5][&version=2026-01]
+     */
+    if (path === '/admin/shopify' && request.method === 'GET') {
+      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      const result = await sampleShopify(env, Number(url.searchParams.get('limit') ?? 5));
+      return new Response(JSON.stringify(result, null, 2), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    /*
+     * Read-only: lists the business's catalogs and samples each one.
+     *
+     *   /admin/catalogs?token=<VERIFY_TOKEN>&business=<BUSINESS_ID>
+     */
+    if (path === '/admin/catalogs' && request.method === 'GET') {
+      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      const business = url.searchParams.get('business');
+      if (!business) return new Response('Missing ?business=<BUSINESS_ID>', { status: 400 });
+
+      const result = await surveyCatalogs(env, business);
+      return new Response(JSON.stringify(result, null, 2), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
     }
 
     if (path !== '/webhook') {
