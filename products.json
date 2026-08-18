@@ -1,0 +1,833 @@
+[
+  {
+    "retailer_id": "RWTOBJASS2200963600S1",
+    "title": "Wrapped in Happiness Overlay",
+    "category": "Jackets",
+    "price_inr": 3240,
+    "sizes_in_stock": [
+      "XS/S",
+      "M/L",
+      "XL/2XL",
+      "3XL/4XL"
+    ],
+    "local_image": "jackets/01-wrapped-in-happiness-overlay.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/Wrapped_in_Happiness_Overlay_1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/Wrapped_in_Happiness_Overlay_2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/Wrapped_in_Happiness_Overlay_3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/Wrapped_in_Happiness_Overlay_4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/Wrapped_in_Happiness_Overlay_5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/Wrapped_in_Happiness_Overlay_6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/Wrapped_in_Happiness_Overlay_7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/Wrapped_in_Happiness_Overlay_8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wrapped_in_Happiness_Overlay_9.png"
+    ],
+    "product_url": "https://reistor.in/products/wrapped-in-happiness-overlay"
+  },
+  {
+    "retailer_id": "RWNBKBLSS2302516000",
+    "title": "Summer Heat Blazer in Black",
+    "category": "Jackets",
+    "price_inr": 4200,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "jackets/02-summer-heat-blazer-in-black.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Summer_Heat_Blazer_in_Black.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/SUMMERHEATBLAZER4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/SUMMERHEATBLAZER7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/SUMMERHEATBLAZER6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/SUMMERHEATBLAZER5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/SUMMERHEATBLAZER3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/SUMMERHEATBLAZER8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/SUMMERHEATBLAZER1.jpg"
+    ],
+    "product_url": "https://reistor.in/products/summer-heat-blazer-in-black"
+  },
+  {
+    "retailer_id": "RWWCTTUFW24048696",
+    "title": "Cropped Cotton Tweed Vest in Cream",
+    "category": "Jackets",
+    "price_inr": 4800,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "jackets/03-cropped-cotton-tweed-vest-in-cream.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Cropped_Cotton_Tweed_Vest_in_Cream_bf117bec-2ae6-48db-ae74-68ffba55ae61.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CroppedCottonTweedVest-ChestnutTwist-02.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CroppedCottonTweedVest-ChestnutTwist-01.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CroppedCottonTweedVest-ChestnutTwist-05.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CroppedCottonTweedVest-ChestnutTwist-07.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CroppedCottonTweedVest-ChestnutTwist-09.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CroppedCottonTweedVest-ChestnutTwist-11.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CroppedCottonTweedVest-ChestnutTwist-13.jpg"
+    ],
+    "product_url": "https://reistor.in/products/cropped-cotton-tweed-vest-in-cream"
+  },
+  {
+    "retailer_id": "RWWSBJAFW240459144",
+    "title": "Lady Jacket in Grey Cotton Tweed",
+    "category": "Jackets",
+    "price_inr": 4800,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "jackets/04-lady-jacket-in-grey-cotton-tweed.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Lady_Jacket_in_Grey_Cotton_Tweed.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/LadyJacketinCottonTweed-SteelBreeze-02.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/LadyJacketinCottonTweed-SteelBreeze-03.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/LadyJacketinCottonTweed-SteelBreeze-04.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/LadyJacketinCottonTweed-SteelBreeze-05.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/LadyJacketinCottonTweed-SteelBreeze-06.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/LadyJacketinCottonTweed-SteelBreeze-07.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/LadyJacketinCottonTweed-SteelBreeze-08.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/LadyJacketinCottonTweed-SteelBreeze-9.jpg"
+    ],
+    "product_url": "https://reistor.in/products/lady-jacket-in-grey-cotton-tweed"
+  },
+  {
+    "retailer_id": "RWHWHBLSS2100506000",
+    "title": "She's Everything Blazer in White",
+    "category": "Jackets",
+    "price_inr": 6000,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "jackets/05-she-s-everything-blazer-in-white.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/She_s_Everything_Blazer_in_White_1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/She_s_Everything_Blazer_in_White_2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/She_s_Everything_Blazer_in_White_3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/She_s_Everything_Blazer_in_White_4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/She_s_Everything_Blazer_in_White_5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/She_s_Everything_Blazer_in_White_6.png",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/The-She_s-Everything-Blazer-White-6.jpg"
+    ],
+    "product_url": "https://reistor.in/products/shes-everything-blazer-in-white"
+  },
+  {
+    "retailer_id": "RWKTETUFW24128199",
+    "title": "Relaxed Tee in Teal",
+    "category": "Tops",
+    "price_inr": 1500,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "tops/01-relaxed-tee-in-teal.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/1._e6ceec6d-dfe8-42a9-88c1-7d20e1e576c7.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/2._096f7e28-8061-4b8c-b631-14b6e5256396.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/4._266b4378-2b66-4dac-bef4-79601a97a27c.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/5..jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/3._7729fb44-ee7e-4d48-b26b-d187ce4d90a4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/6..jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/7..jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/8..jpg"
+    ],
+    "product_url": "https://reistor.in/products/relaxed-tee-in-teal"
+  },
+  {
+    "retailer_id": "RWOLNTUSS2509363600",
+    "title": "Relaxed V-neck Top in Stripes",
+    "category": "Tops",
+    "price_inr": 2400,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "tops/02-relaxed-v-neck-top-in-stripes.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/RelaxedV-neckTopinStripes-1_8f6e803b-7c95-4c1e-ab03-6fb50bebfd2a.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/RelaxedV-neckTopinStripes-3_611db80b-5ccf-4e60-bd0f-99360e4ab6cc.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/RelaxedV-neckTopinStripes-2_d320f790-effe-4c37-8bf7-d23712f8f4ca.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/RelaxedV-neckTopinStripes-6_42f7840a-e2ce-4a00-bb38-bac29bb8b000.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/RelaxedV-neckTopinStripes-4_b06a7b8c-e399-4692-9bd6-56b441659770.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/RelaxedV-neckTopinStripes-5_0b81f564-5fb3-4aac-821c-b0ec0d939623.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/RelaxedV-neckTopinStripes-7_45895417-eebc-4641-9388-d3a74102722a.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/RelaxedV-neckTopinStripes-8_f971e9f5-f035-45d9-b76f-585e6b49a08d.jpg"
+    ],
+    "product_url": "https://reistor.in/products/relaxed-v-neck-top-in-stripes"
+  },
+  {
+    "retailer_id": "RWOEBTURS26096696",
+    "title": "V-Neck Embroidered Top with Front Buttons in Black",
+    "category": "Tops",
+    "price_inr": 3600,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "tops/03-v-neck-embroidered-top-with-front-buttons-in-b.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-9.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/v-neck-embroidered-top-with-front-buttons-in-black-10.jpg"
+    ],
+    "product_url": "https://reistor.in/products/v-neck-embroidered-top-with-front-buttons-in-black"
+  },
+  {
+    "retailer_id": "RWHBLTUSS2100033900",
+    "title": "Wind in my Hair Shirt in Blue",
+    "category": "Tops",
+    "price_inr": 3900,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "tops/04-wind-in-my-hair-shirt-in-blue.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wind_in_my_Hair_Shirt_in_Blue_1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wind_in_my_Hair_Shirt_in_Blue_2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wind_in_my_Hair_Shirt_in_Blue_3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wind_in_my_Hair_Shirt_in_Blue_4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wind_in_my_Hair_Shirt_in_Blue_5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wind-in-My-Hair-Shirt-Blue-6.jpg"
+    ],
+    "product_url": "https://reistor.in/products/wind-in-my-hair-shirti-in-summer-blue"
+  },
+  {
+    "retailer_id": "RWBBLTUFW24060096",
+    "title": "The Knot-so-Basic Top in Black",
+    "category": "Tops",
+    "price_inr": 6000,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "tops/05-the-knot-so-basic-top-in-black.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/The_Knot-so-Basic_Top-1_2.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-9.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-10.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheKnot-so-BasicTop-11.jpg"
+    ],
+    "product_url": "https://reistor.in/products/the-knot-so-basic-top-in-black"
+  },
+  {
+    "retailer_id": "RWKBKSHFW24055948",
+    "title": "Essential Knit Shorts in Black",
+    "category": "Bottoms",
+    "price_inr": 1500,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "bottoms/01-essential-knit-shorts-in-black.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-1_aeb6b1d5-4bd7-41d7-95f5-e8d0359262d4.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-2_405d33f0-75bc-45a8-8242-ef99eb9c8349.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-3_d3f72285-b709-44aa-a142-c9d88228f98d.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-4_5b26cd05-a926-437e-8743-136739c21505.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-5_214c54e5-ed08-4b81-882b-eb9f750de7f4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-6_2d992f59-df7d-4300-b44f-eecb50576a7f.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-7_3cc13a49-5a80-4326-88c2-f98b0d0a0a3e.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-8_24d6e54b-3005-4d73-976c-668fab87dd7b.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-9_4f441d41-4887-412b-b082-980238536b02.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-10_85ce8c28-c328-449a-bccf-ac423692d18a.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EssentialKnitShortsinBlack-11_60ba2a0c-5a23-44b8-8b26-117c0c88235c.jpg"
+    ],
+    "product_url": "https://reistor.in/products/essential-knit-shorts-in-black"
+  },
+  {
+    "retailer_id": "RWKFMPTFW24100287",
+    "title": "Wide Leg Pant in Olive",
+    "category": "Bottoms",
+    "price_inr": 2100,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "bottoms/02-wide-leg-pant-in-olive.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wide_leg_pant_in_light_olive_2.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wide_leg_pant_in_light_olive_3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wide_leg_pant_in_light_olive_4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wide_leg_pant_in_light_olive_5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wide_leg_pant_in_light_olive_6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wide_leg_pant_in_light_olive_-_1.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wide_leg_pant_in_light_olive_7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wide_leg_pant_in_light_olive_8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Wide_leg_pant_in_light_olive_9.jpg"
+    ],
+    "product_url": "https://reistor.in/products/wide-leg-pant-in-olive"
+  },
+  {
+    "retailer_id": "RWHNBSHSS25077496",
+    "title": "Drawstring Shorts in Neutral Beige",
+    "category": "Bottoms",
+    "price_inr": 3900,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL"
+    ],
+    "local_image": "bottoms/03-drawstring-shorts-in-neutral-beige.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-9.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Drawstring_Shorts_in_Neutral_Beige-10.jpg"
+    ],
+    "product_url": "https://reistor.in/products/drawstring-shorts-in-neutral-beige"
+  },
+  {
+    "retailer_id": "RWWSBSHFW24050190",
+    "title": "Cotton Tweed Skort in Grey",
+    "category": "Bottoms",
+    "price_inr": 4800,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "bottoms/04-cotton-tweed-skort-in-grey.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-11.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-02.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-03.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Cotton-Tweed-Skort-in-Grey-1_1.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-04.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-06.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-08.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-09.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-10.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-12.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/CottonTweedSkort-SteelBreeze-13.jpg"
+    ],
+    "product_url": "https://reistor.in/products/cotton-tweed-skort-in-grey"
+  },
+  {
+    "retailer_id": "RWPR4SKRS25074190",
+    "title": "Drawstring Short Skirt in Blue Florals",
+    "category": "Bottoms",
+    "price_inr": 7791,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "bottoms/05-drawstring-short-skirt-in-blue-florals.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortSkirtinBlueFlorals_1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortSkirtinBlueFlorals_2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortSkirtinBlueFlorals_3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortSkirtinBlueFlorals_4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortSkirtinBlueFlorals_5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortSkirtinBlueFlorals_6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortSkirtinBlueFlorals_7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortSkirtinBlueFlorals_8.jpg"
+    ],
+    "product_url": "https://reistor.in/products/drawstring-short-skirt-in-blue-florals"
+  },
+  {
+    "retailer_id": "RWNBKDRFW230323126",
+    "title": "Fitted Knee Length Dress in Black",
+    "category": "Dresses",
+    "price_inr": 1755,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "dresses/01-fitted-knee-length-dress-in-black.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Fitted_Knee_Length_Dress_in_Black.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/FITTEDKNEELENGTHBLACKDRESS2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/FITTEDKNEELENGTHBLACKDRESS7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/FITTEDKNEELENGTHBLACKDRESS3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/FITTEDKNEELENGTHBLACKDRESS1.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/FITTEDKNEELENGTHBLACKDRESS4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/FITTEDKNEELENGTHBLACKDRESS8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/FITTEDKNEELENGTHBLACKDRESS5.jpg"
+    ],
+    "product_url": "https://reistor.in/products/fitted-knee-length-dress-in-black"
+  },
+  {
+    "retailer_id": "RWKFMDRFW240544114",
+    "title": "Drawstring Short T-shirt Dress in Light Olive",
+    "category": "Dresses",
+    "price_inr": 4200,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "dresses/02-drawstring-short-t-shirt-dress-in-light-olive.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-01_73be4113-1e2a-4cf8-8b46-38235a0ae896.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-02_e6407281-592e-4442-a2ea-40b77e4de4e3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-03_b534ccef-e044-4c15-9f6d-39c4f5fea962.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-04_e00ad5a4-6e13-4d77-a876-a35889740e0e.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-05_f7d7b1c8-3275-466c-9b27-f5dc4b4e5a05.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-06_9232c0ba-9328-4236-92c0-e2ef70083b63.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-07_2f684dbd-ef1b-43a9-9e0e-c7da8e6d488f.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-08_f6a96e10-1125-44a8-b54c-507b462233ac.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-09_6be75a33-ab3b-4d7a-992e-610ab527fdb0.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-10_bcc47a49-dae4-48cd-8c06-bd616acfcd7e.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/DrawstringShortT-shirtDressinLightOlive-11_b69f2eab-68e4-4dcc-bf38-7e48da5bf3e9.jpg"
+    ],
+    "product_url": "https://reistor.in/products/drawstring-short-t-shirt-dress-in-light-olive"
+  },
+  {
+    "retailer_id": "RWCECDRSS261125165",
+    "title": "The Smocked Maxi Dress in Grey Check",
+    "category": "Dresses",
+    "price_inr": 5400,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "dresses/03-the-smocked-maxi-dress-in-grey-check.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/1_f014280a-7c80-490e-9591-d759c647b16c.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/2_4e27db29-f276-4943-9f1d-53f91df67b2a.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/3_17b127aa-18bf-4608-918e-51b6d5457d03.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/4_15352b9a-8a57-414b-b467-7c799c23366a.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/6_677afb91-23e9-41b0-9123-365df59ac8ae.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/15_ff3d0c85-4b11-4f70-97f6-89777836f52f.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/9_8581ce26-d654-4e74-a819-e028458c459f.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/7_4a23ba21-d18e-48fb-8980-42a72b1733c4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/8_9304e792-68f8-49fb-b671-0b8cfaeea639.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/5_475a05c6-02ca-45e4-b582-8f04e546533a.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/10_e67ecd4c-f9a3-47eb-928b-9a65caf83172.jpg"
+    ],
+    "product_url": "https://reistor.in/products/the-smocked-maxi-dress-in-grey-check"
+  },
+  {
+    "retailer_id": "RWHBKDRRS260954141",
+    "title": "Meet me by the Cliff Dress in Black",
+    "category": "Dresses",
+    "price_inr": 6900,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "dresses/04-meet-me-by-the-cliff-dress-in-black.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-9.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-10.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/meet-me-by-the-cliff-dress-in-black-11.jpg"
+    ],
+    "product_url": "https://reistor.in/products/meet-me-by-the-cliff-dress-in-black"
+  },
+  {
+    "retailer_id": "RWPR4DRRS250681168",
+    "title": "Gathered Maxi Dress with Drawstring in Blue Florals",
+    "category": "Dresses",
+    "price_inr": 16213,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "dresses/05-gathered-maxi-dress-with-drawstring-in-blue-fl.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_9.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_10.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/MaxiGatheredDressinBlueFlorals_11.jpg"
+    ],
+    "product_url": "https://reistor.in/products/maxi-gathered-dress-in-blue-florals"
+  },
+  {
+    "retailer_id": "RWKBKRPFW240583123",
+    "title": "V neck Drawstring Knit Romper in Black",
+    "category": "Jumpsuits",
+    "price_inr": 4200,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "jumpsuits/01-v-neck-drawstring-knit-romper-in-black.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-01_68861cff-c6b4-4b6e-ac9c-42e07835968c.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-02_3b24e8de-5a8d-4d13-982c-6b6d2dd82ecd.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-03_29cf99e5-7457-4870-9553-5e898ce11b20.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-04_ebf169a7-7dbb-4fe9-889a-99db641d5fa4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-05_e48c7dc2-0684-4343-b1ab-1f6a8d8e5c89.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-06_d161d0fe-ad32-4089-b6d6-f52e8c3b0d3a.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-07_1306e12b-a8d6-47fb-bc4e-b7266d4ee06b.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-08_5ab13569-e865-4a3e-b833-1e30283188d7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-09_7b800053-165b-4099-bcc5-7b352d645cec.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-10_6c900daf-a999-431c-8cd6-ff3fc44bee81.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/VneckDrawstringKnitRomperinBlack-11_3bb99718-52e0-4e15-ab50-8480068f2172.jpg"
+    ],
+    "product_url": "https://reistor.in/products/v-neck-drawstring-knit-romper-in-black"
+  },
+  {
+    "retailer_id": "RWHBKJSAW2202235100",
+    "title": "Cropped Wrap Jumpsuit",
+    "category": "Jumpsuits",
+    "price_inr": 5100,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "jumpsuits/02-cropped-wrap-jumpsuit.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/BlackCroppedWrapHempJumpsuit-2.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/BlackCroppedWrapHempJumpsuit-5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/BlackCroppedWrapHempJumpsuit-3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/BlackCroppedWrapHempJumpsuit-4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/BlackCroppedWrapHempJumpsuit-1.jpg"
+    ],
+    "product_url": "https://reistor.in/products/cropped-wrap-jumpsuit"
+  },
+  {
+    "retailer_id": "RWHOWJSSS2100387200S1",
+    "title": "Breakfast in Bed Jumpsuit in Off-white",
+    "category": "Jumpsuits",
+    "price_inr": 6120,
+    "sizes_in_stock": [
+      "XS/S",
+      "M/L",
+      "XL/2XL"
+    ],
+    "local_image": "jumpsuits/03-breakfast-in-bed-jumpsuit-in-off-white.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breakfast_in_Bed_Jumpsuit_in_Off-white_1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breakfast_in_Bed_Jumpsuit_in_Off-white_2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breakfast_in_Bed_Jumpsuit_in_Off-white_3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breakfast_in_Bed_Jumpsuit_in_Off-white_4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breakfast_in_Bed_Jumpsuit_in_Off-white_5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breakfast_in_Bed_Jumpsuit_in_Off-white_6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breakfast_in_Bed_Jumpsuit_in_Off-white_7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breakfast_in_Bed_Jumpsuit_in_Off-white_8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breakfast_in_Bed_Jumpsuit_in_Off-white_9.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/bed-jumpsuit-in-off-white-12.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/bed-jumpsuit-in-off-white-13.png"
+    ],
+    "product_url": "https://reistor.in/products/breakfast-in-bed-jumpsuit"
+  },
+  {
+    "retailer_id": "RWHHGJSFW230329144",
+    "title": "Evening Chai Jumpsuit in Dark Green",
+    "category": "Jumpsuits",
+    "price_inr": 7200,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "jumpsuits/04-evening-chai-jumpsuit-in-dark-green.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Evening_Chai_Jumpsuit_in_Dark_Green.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EveningChaiJumpsuitDarkGreen-8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EveningChaiJumpsuitDarkGreen-4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EveningChaiJumpsuitDarkGreen-10.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EveningChaiJumpsuitDarkGreen-1.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EveningChaiJumpsuitDarkGreen-3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EveningChaiJumpsuitDarkGreen-5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EveningChaiJumpsuitDarkGreen-6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Evening-Chai-Jumpsuit-in-Dark-Green-1.png",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Evening_Chai_Jumpsuit_in_Dark_Green2.png",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/EveningChaiJumpsuitDarkGreen-9.jpg"
+    ],
+    "product_url": "https://reistor.in/products/evening-chai-jumpsuit-n-dark-green"
+  },
+  {
+    "retailer_id": "RWHOWRPSS2201877800",
+    "title": "Barefoot in the Park Romper in Off-white",
+    "category": "Jumpsuits",
+    "price_inr": 7800,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "jumpsuits/05-barefoot-in-the-park-romper-in-off-white.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Barefoot_in_the_Park_Romper_in_Off-white.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/BAREFOOT-IN-THE-PARK-ROMPER-2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/BAREFOOT-IN-THE-PARK-ROMPER-1.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/BAREFOOT-IN-THE-PARK-ROMPER-3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/BAREFOOT-IN-THE-PARK-ROMPER-4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/BAREFOOT-IN-THE-PARK-ROMPER-5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/BAREFOOT-IN-THE-PARK-ROMPER-7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/BAREFOOT-IN-THE-PARK-ROMPER-8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/influencer_1440_x_2160_11.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Barefoot-in-the-park-romper.png"
+    ],
+    "product_url": "https://reistor.in/products/barefoot-in-the-park-romper-in-off-white"
+  },
+  {
+    "retailer_id": "RWTN7COAW2200N92100",
+    "title": "Laze and Unwind Pajama Shorts Set",
+    "category": "Co-ord Sets",
+    "price_inr": 1680,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "co-ord-sets/01-laze-and-unwind-pajama-shorts-set.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/ReistorBombay02922.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/ReistorBombay02892.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/products/ReistorBombay02852.jpg"
+    ],
+    "product_url": "https://reistor.in/products/laze-and-unwind-pajama-shorts-set-faded-dreams"
+  },
+  {
+    "retailer_id": "RWKAMSTFW241017135",
+    "title": "Relaxed Tee Set in Earth Grey",
+    "category": "Co-ord Sets",
+    "price_inr": 3600,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "co-ord-sets/02-relaxed-tee-set-in-earth-grey.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Earth_Grey-1.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Earth_Grey-2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Brown-3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Earth_Grey-6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Earth_Grey-8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Earth_Grey-4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Earth_Grey-5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Earth_Grey-7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Earth_Grey-9.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Relaxed_Tee_Set_in_Earth_Grey-10.jpg"
+    ],
+    "product_url": "https://reistor.in/products/relaxed-tee-set-in-earth-grey"
+  },
+  {
+    "retailer_id": "RWNWHCOSS23ST27171",
+    "title": "Breezy Summer Set in White",
+    "category": "Co-ord Sets",
+    "price_inr": 8400,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "co-ord-sets/03-breezy-summer-set-in-white.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breezy_Summer_Set_in_White.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breezy_Summer_Set_in_White_2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breezy_Summer_Set_in_White_3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breezy_Summer_Set_in_White_4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breezy_Summer_Set_in_White_5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breezy_Summer_Set_in_White_6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Breezy_Summer_Set_in_White_7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy-Crop-Top-Organic-cotton-6.jpg"
+    ],
+    "product_url": "https://reistor.in/products/breezy-summer-set"
+  },
+  {
+    "retailer_id": "RWHNBSTSS250828216",
+    "title": "Boxy Shirt with Lace Set",
+    "category": "Co-ord Sets",
+    "price_inr": 8700,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL",
+      "3XL"
+    ],
+    "local_image": "co-ord-sets/04-boxy-shirt-with-lace-set.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-2.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-1.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-9.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-5.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-6.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-7.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-8.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/Boxy_Shirt_with_Lace_Set-10.jpg"
+    ],
+    "product_url": "https://reistor.in/products/boxy-shirt-with-lace-set"
+  },
+  {
+    "retailer_id": "RWHWHSTSS2100ST813600",
+    "title": "Hemp Three Piece Set in White",
+    "category": "Co-ord Sets",
+    "price_inr": 13500,
+    "sizes_in_stock": [
+      "XS",
+      "S",
+      "M",
+      "L",
+      "XL",
+      "2XL"
+    ],
+    "local_image": "co-ord-sets/05-hemp-three-piece-set-in-white.jpg",
+    "image_link": "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/THE-HEMP-THREE-PIECE-SET-1_0f0c532b-c776-4d93-a4fa-ba14fcb33a39.jpg",
+    "additional_image_link": [
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheHempThreePieceSet3.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheHempThreePieceSet2.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheHempThreePieceSet4.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheHempThreePieceSet1.jpg",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheHempThreePieceSet6.png",
+      "https://cdn.shopify.com/s/files/1/0522/4657/7337/files/TheHempThreePieceSet7.png"
+    ],
+    "product_url": "https://reistor.in/products/the-hemp-three-piece-set"
+  }
+]

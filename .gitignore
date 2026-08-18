@@ -6,3 +6,10 @@ dist/
 
 # Local editor / agent settings — personal, not project config
 .claude/settings.local.json
+.claude/claude-code-chat-images/
+.vscode/
+
+# Source archive the product photos were extracted from. The extracted files
+# are committed under tops/, dresses/, bottoms/ etc., so the tarball is a
+# duplicate — kept locally, not worth 4.8MB in every clone.
+reistorshopifycategories*.tar.gz
