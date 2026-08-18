@@ -1,8 +1,14 @@
 node_modules/
 dist/
 .wrangler/
-.dev.vars
 *.log
+
+# Secrets. .dev.vars is wrangler's; .env is the Linode server's. Both hold the
+# WhatsApp token, the Supabase service key and the app secret in plain text.
+.dev.vars
+.env
+.env.*
+!.env.example
 
 # Local editor / agent settings — personal, not project config
 .claude/settings.local.json

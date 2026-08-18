@@ -3,7 +3,21 @@ main = "src/index.ts"
 compatibility_date = "2026-08-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Nightly analytics pull: Shopify orders, Meta template performance, account
+# health, and the abandoned-session sweep. 21:00 UTC is 02:30 IST.
+#
+# Template read and click counts expire after 7 days on Meta's side, so missing
+# this job for a week loses that data permanently — it cannot be backfilled.
+[triggers]
+crons = ["0 21 * * *"]
+
 # Per-user conversation state, keyed by the WhatsApp `wa_id` (sender number).
+#
+# Now a FALLBACK. When SUPABASE_URL and SUPABASE_SERVICE_KEY are set, state
+# moves to Postgres instead — which is what lets the identical code run on a
+# Linode box, where Workers KV does not exist. Setting those two secrets flips
+# the store over with no code change and no redeploy.
+#
 # Create it once with:
 #   wrangler kv namespace create STATE
 #   wrangler kv namespace create STATE --preview
@@ -38,8 +52,20 @@ IND_SHOPIFY_STORE = "reistor-life.myshopify.com"
 IND_SHOPIFY_STORE_ID = "gid://shopify/Shop/52246577337"
 IND_SHOPIFY_API_VERSION = "2026-04"
 
+# WhatsApp Business Account id. Needed by the nightly pull to read template
+# performance; not sensitive.
+WABA_ID = ""
+
 # Secrets — set these with `wrangler secret put <NAME>`, never in this file:
-#   WHATSAPP_TOKEN     Meta system-user / temporary access token
-#   PHONE_NUMBER_ID    WhatsApp Business phone number id
-#   VERIFY_TOKEN       any string; must match what you paste into Meta
-#   ANTHROPIC_API_KEY  Anthropic API key (optional — see README fallback note)
+#   WHATSAPP_TOKEN        Meta system-user / temporary access token
+#   PHONE_NUMBER_ID       WhatsApp Business phone number id
+#   VERIFY_TOKEN          any string; must match what you paste into Meta
+#   APP_SECRET            Meta App Secret. REQUIRED before a production number:
+#                         without it, webhook signatures are not verified and
+#                         anyone who finds the URL can make this Worker send
+#                         WhatsApp messages on your bill.
+#   ANTHROPIC_API_KEY     Anthropic API key (optional — see README fallback note)
+#   SUPABASE_URL          https://<project>.supabase.co
+#   SUPABASE_SERVICE_KEY  service role key — bypasses row level security, so it
+#                         belongs only here, never in a browser
+#   DASHBOARD_TOKEN       shared secret guarding /dashboard

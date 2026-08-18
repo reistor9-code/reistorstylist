@@ -1,0 +1,63 @@
+# systemd unit for the bot.
+#
+#   cp deploy/reistor-stylist.service /etc/systemd/system/
+#   systemctl daemon-reload
+#   systemctl enable --now reistor-stylist
+#   journalctl -u reistor-stylist -f
+#
+# Assumes the repo is at /opt/reistor-stylist and owned by a `reistor` user
+# that owns nothing else. Adjust the paths if you put it elsewhere.
+
+[Unit]
+Description=Reistor AI Stylist — WhatsApp bot
+Documentation=https://github.com/reistor9-code/reistorstylist
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=reistor
+Group=reistor
+WorkingDirectory=/opt/reistor-stylist
+
+# --env-file is built into Node 20+, so no dotenv dependency is needed. The
+# file holds every secret, which is why the unit also requires it to exist:
+# starting without it would run the bot with no token and fail every send.
+ExecStart=/usr/bin/node --env-file=/opt/reistor-stylist/.env /opt/reistor-stylist/dist/server.js
+
+# The process drains in-flight background work on SIGTERM, so give it room
+# rather than killing analytics writes mid-deploy.
+KillSignal=SIGTERM
+TimeoutStopSec=20
+
+Restart=always
+RestartSec=5
+# Stop restart-looping on a genuine misconfiguration: five failures in a
+# minute means the problem is not transient and a human should look.
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=reistor-stylist
+
+# --- Hardening -------------------------------------------------------------
+# This process needs the network, its own directory and nothing else.
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+# ProtectSystem=strict makes everything read-only; nothing needs writing, since
+# logs go to the journal and all state lives in Supabase.
+ReadWritePaths=
+
+[Install]
+WantedBy=multi-user.target

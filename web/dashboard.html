@@ -1,0 +1,729 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta name="color-scheme" content="dark light">
+<title>Stylist Control Room — Reistor</title>
+<style>
+/*__FONTS__*/
+
+/* Dark is the committed design — the reference is a dark product, so :root
+   carries the full dark palette and light is the redefinition. */
+:root{
+  --sidebar:#09090B; --bg:#131317; --card:#1C1C21; --raise:#24242A;
+  --line:#2B2B33; --line-soft:#212128;
+  --text:#F0F0F3; --mute:#8B8B96; --dim:#5F5F6B;
+  --gold:#B9A05A; --mauve:#B5758C; --peri:#7B80B8;
+  --pink:#EFA3C4; --lav:#A8A5E6; --yellow:#F2D26B;
+  --badge:#6D64D6; --badge-ink:#FFFFFF;
+  --good:#8FCB9B; --good-bg:#1B2A20; --warn:#F2D26B; --warn-bg:#2C2716;
+  --bad:#E8877C; --bad-bg:#2E1B18;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 12px 32px rgba(0,0,0,.22);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --sidebar:#FFFFFF; --bg:#F3F3F6; --card:#FFFFFF; --raise:#F5F5F8;
+    --line:#E3E3E9; --line-soft:#EDEDF1;
+    --text:#16161B; --mute:#66666F; --dim:#9797A2;
+    --gold:#8E7830; --mauve:#8E4E64; --peri:#585DA0;
+    --pink:#C56491; --lav:#6F6BC9; --yellow:#A8842A;
+    --badge:#5A50C4; --badge-ink:#FFFFFF;
+    --good:#3F7A50; --good-bg:#E4F0E7; --warn:#8A6A15; --warn-bg:#FBF1D8;
+    --bad:#B0432F; --bad-bg:#FBE6E2;
+    --shadow:0 1px 2px rgba(20,20,30,.05),0 10px 28px rgba(20,20,30,.06);
+  }
+}
+:root[data-theme="light"]{
+  --sidebar:#FFFFFF; --bg:#F3F3F6; --card:#FFFFFF; --raise:#F5F5F8;
+  --line:#E3E3E9; --line-soft:#EDEDF1;
+  --text:#16161B; --mute:#66666F; --dim:#9797A2;
+  --gold:#8E7830; --mauve:#8E4E64; --peri:#585DA0;
+  --pink:#C56491; --lav:#6F6BC9; --yellow:#A8842A;
+  --badge:#5A50C4; --badge-ink:#FFFFFF;
+  --good:#3F7A50; --good-bg:#E4F0E7; --warn:#8A6A15; --warn-bg:#FBF1D8;
+  --bad:#B0432F; --bad-bg:#FBE6E2;
+  --shadow:0 1px 2px rgba(20,20,30,.05),0 10px 28px rgba(20,20,30,.06);
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--text);
+  font:400 15px/1.5 Outfit,ui-sans-serif,system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums}
+.app{display:grid;grid-template-columns:1fr;min-height:100vh}
+@media (min-width:960px){.app{grid-template-columns:236px 1fr}}
+
+/* ── sidebar ─────────────────────────────────────── */
+.side{background:var(--sidebar);padding:22px 16px;display:flex;flex-direction:column;gap:26px;
+  border-right:1px solid var(--line-soft)}
+@media (min-width:960px){.side{position:sticky;top:0;height:100vh;overflow-y:auto}}
+.brand{display:flex;align-items:center;gap:10px;padding:0 8px}
+.brand .dot{width:26px;height:26px;border-radius:8px;flex:none;
+  background:linear-gradient(135deg,var(--lav),var(--pink))}
+.brand b{font-size:17px;font-weight:700;letter-spacing:-.02em}
+nav{display:flex;flex-direction:column;gap:2px}
+.navlab{font-size:11px;color:var(--dim);padding:14px 10px 6px;letter-spacing:.04em}
+nav a{display:flex;align-items:center;gap:11px;padding:9px 11px;border-radius:9px;
+  color:var(--mute);text-decoration:none;font-size:14px;transition:.14s}
+nav a:hover{color:var(--text);background:var(--raise)}
+nav a.on{color:var(--text);background:var(--raise)}
+nav a:focus-visible{outline:2px solid var(--lav);outline-offset:1px}
+nav svg{width:17px;height:17px;flex:none;stroke:currentColor;fill:none;stroke-width:1.6}
+.sidefoot{margin-top:auto;padding:12px 10px 0;border-top:1px solid var(--line-soft);
+  font-size:12px;color:var(--dim);line-height:1.6}
+
+/* ── main ────────────────────────────────────────── */
+main{padding:20px;display:flex;flex-direction:column;gap:16px;min-width:0}
+@media (min-width:960px){main{padding:22px 26px 40px}}
+.topbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.range{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;
+  background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 15px}
+.range svg{width:16px;height:16px;stroke:var(--dim);fill:none;stroke-width:1.7;flex:none}
+.range .r1{font-size:14px}
+.range .r2{color:var(--dim);font-size:13px}
+.chip{background:var(--card);border:1px solid var(--line);border-radius:10px;
+  padding:9px 13px;font-size:13px;color:var(--mute);white-space:nowrap}
+.chip b{color:var(--text);font-weight:700}
+.btn{background:var(--text);color:var(--bg);border:0;border-radius:11px;
+  padding:11px 17px;font:700 13.5px Outfit,sans-serif;cursor:pointer}
+.btn:focus-visible{outline:2px solid var(--lav);outline-offset:2px}
+.btn[disabled]{opacity:.55;cursor:progress}
+.btn.ghost{background:var(--card);color:var(--mute);border:1px solid var(--line)}
+.btn.ghost:hover{color:var(--text)}
+/* Native select, restyled: a custom dropdown would need focus trapping and
+   keyboard handling that a select already has for free. */
+.sel{background:var(--card);color:var(--text);border:1px solid var(--line);border-radius:11px;
+  padding:10px 13px;font:400 13.5px Outfit,sans-serif;cursor:pointer}
+.sel:focus-visible{outline:2px solid var(--lav);outline-offset:1px}
+
+/* ── alert ───────────────────────────────────────── */
+.alert{display:flex;gap:13px;align-items:flex-start;background:var(--bad-bg);
+  border:1px solid var(--bad);border-radius:13px;padding:15px 18px}
+.alert .ai{width:22px;height:22px;border-radius:50%;background:var(--bad);color:var(--bg);
+  font:700 14px Outfit,sans-serif;display:flex;align-items:center;justify-content:center;flex:none}
+.alert h4{font-size:15px;font-weight:700;color:var(--bad)}
+.alert p{font-size:13.5px;color:var(--text);margin-top:3px;opacity:.9}
+
+/* ── grid ────────────────────────────────────────── */
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;
+  padding:20px 22px;box-shadow:var(--shadow);grid-column:span 12;min-width:0}
+.ch{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:4px}
+.ch h3{font-size:19px;font-weight:700;letter-spacing:-.02em}
+.pill{background:var(--raise);border-radius:20px;padding:5px 11px;font-size:12px;color:var(--mute);
+  white-space:nowrap}
+.note{font-size:12.5px;color:var(--dim);line-height:1.55;margin-top:9px}
+@media (min-width:900px){
+  .c8{grid-column:span 8}.c7{grid-column:span 7}.c6{grid-column:span 6}
+  .c5{grid-column:span 5}.c4{grid-column:span 4}
+}
+
+/* ── funnel ──────────────────────────────────────── */
+.fn{display:flex;flex-direction:column;gap:9px;margin-top:16px}
+.frow{display:grid;grid-template-columns:132px 1fr 58px 66px;gap:12px;align-items:center}
+@media (max-width:620px){.frow{grid-template-columns:104px 1fr 46px 58px;gap:8px}}
+.flab{font-size:13.5px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ftrack{height:30px;background:var(--raise);border-radius:8px;overflow:hidden;position:relative}
+/* display:block is load-bearing. A bare span is inline, and an inline box
+   ignores width and height entirely — the bars rendered as nothing at all
+   while every track drew correctly around them. */
+.fbar{display:block;height:100%;border-radius:8px;transition:width .5s cubic-bezier(.4,0,.2,1)}
+.fnum{font-size:14.5px;font-weight:700;text-align:right}
+.flost{font-size:12.5px;text-align:right;color:var(--dim)}
+.flost.hot{color:var(--bad);font-weight:700}
+.frow.hot .flab{color:var(--text)}
+.frow.hot .ftrack{box-shadow:0 0 0 1.5px var(--bad)}
+
+/* ── stat ────────────────────────────────────────── */
+.stack{display:flex;flex-direction:column;gap:16px;grid-column:span 12}
+@media (min-width:900px){.stack{grid-column:span 4}}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px 22px;
+  box-shadow:var(--shadow);flex:1;display:flex;flex-direction:column;justify-content:center}
+.stat .sl{font-size:14.5px;color:var(--mute)}
+.stat .sv{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:9px}
+.stat .sn{font-size:34px;font-weight:700;letter-spacing:-.03em;line-height:1}
+.badge{background:var(--badge);color:var(--badge-ink);border-radius:20px;padding:5px 11px;
+  font-size:12px;font-weight:700;white-space:nowrap}
+
+/* ── kanban ──────────────────────────────────────── */
+.kan{grid-column:span 12;display:grid;gap:0;grid-template-columns:1fr}
+@media (min-width:1120px){.kan{grid-template-columns:repeat(4,1fr)}}
+@media (min-width:660px) and (max-width:1119px){.kan{grid-template-columns:repeat(2,1fr)}}
+.col{padding:0 18px;border-left:1px dashed var(--line);min-width:0}
+.col:first-child{border-left:0;padding-left:0}
+@media (max-width:1119px){.col{border-left:0;padding:0 0 22px}}
+.colh{display:flex;align-items:baseline;gap:9px;margin-bottom:14px}
+.colh h4{font-size:17px;font-weight:700;letter-spacing:-.02em}
+.colh span{font-size:12.5px;color:var(--dim)}
+.mini{background:var(--card);border:1px solid var(--line);border-radius:13px;padding:14px 15px;
+  margin-bottom:10px}
+.mini .tags{display:flex;gap:6px;align-items:center;margin-bottom:9px;flex-wrap:wrap}
+.tag{border-radius:16px;padding:4px 10px;font-size:11.5px;font-weight:700}
+.tag.pink{background:color-mix(in srgb,var(--pink) 22%,transparent);color:var(--pink)}
+.tag.lav{background:color-mix(in srgb,var(--lav) 22%,transparent);color:var(--lav)}
+.tag.gold{background:color-mix(in srgb,var(--gold) 22%,transparent);color:var(--gold)}
+.tag.bad{background:var(--bad-bg);color:var(--bad)}
+.mini b.mt{display:block;font-size:14.5px;font-weight:700;line-height:1.35;margin-bottom:6px}
+.mini .mid{font-size:11.5px;color:var(--dim);margin:-3px 0 7px}
+.mini .mrow{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--mute);
+  padding:3px 0}
+.mini .mrow b{color:var(--text);font-weight:700}
+.mfoot{display:flex;gap:14px;font-size:12px;color:var(--dim);margin-top:9px;
+  padding-top:9px;border-top:1px solid var(--line-soft)}
+.spark{height:6px;border-radius:4px;background:var(--raise);overflow:hidden;margin-top:9px;display:flex}
+.spark i{display:block;height:100%}
+.empty{font-size:13px;color:var(--dim);line-height:1.6;background:var(--raise);
+  border-radius:11px;padding:14px 15px}
+
+/* ── heatmap ─────────────────────────────────────── */
+.heat{overflow-x:auto;margin-top:16px}
+table{border-collapse:separate;border-spacing:4px;width:100%;min-width:520px}
+th{font-size:12px;color:var(--dim);font-weight:400;text-align:center;padding:2px 0}
+th.rh{text-align:left;width:96px}
+td{text-align:center;border-radius:8px;padding:11px 4px;font-size:13.5px;font-weight:700;
+  background:var(--raise);color:var(--dim)}
+td.rh{text-align:left;background:none;color:var(--mute);font-weight:400;font-size:13px;
+  padding-left:0}
+td .sm{display:block;font-size:11px;font-weight:400;opacity:.85;margin-top:2px}
+
+/* ── plain table ─────────────────────────────────── */
+.tw{overflow-x:auto;margin-top:14px}
+.plain{border-collapse:collapse;border-spacing:0;min-width:340px}
+/* Two plain columns need no floor — inheriting the 340px one pushed the
+   figures just past the right edge at 375px and quietly hid them. */
+.plain.two{min-width:0;width:100%}
+.plain th{text-align:left;font-size:12px;color:var(--dim);padding:9px 12px 9px 0;
+  border-bottom:1px solid var(--line)}
+.plain td{background:none;text-align:left;padding:11px 12px 11px 0;font-weight:400;
+  font-size:14px;color:var(--text);border-bottom:1px solid var(--line-soft);border-radius:0}
+.plain td.r,.plain th.r{text-align:right;padding-right:0}
+.plain tr:last-child td{border-bottom:0}
+.st{border-radius:16px;padding:4px 10px;font-size:11.5px;font-weight:700;display:inline-block}
+.st.ok{background:var(--good-bg);color:var(--good)}
+.st.no{background:var(--bad-bg);color:var(--bad)}
+
+/* ── figures row ─────────────────────────────────── */
+.figs{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:16px}
+@media (min-width:520px){.figs.f3{grid-template-columns:repeat(3,1fr)}}
+.fig{background:var(--raise);border-radius:12px;padding:14px 15px}
+.fig .fl{font-size:12.5px;color:var(--mute)}
+.fig .fv{font-size:23px;font-weight:700;letter-spacing:-.02em;margin-top:4px}
+.qp{display:inline-flex;align-items:center;gap:7px;border-radius:20px;padding:7px 13px;
+  font-size:13px;font-weight:700}
+.qp i{width:8px;height:8px;border-radius:50%;background:currentColor;display:block}
+.qp.GREEN{background:var(--good-bg);color:var(--good)}
+.qp.YELLOW{background:var(--warn-bg);color:var(--warn)}
+.qp.RED{background:var(--bad-bg);color:var(--bad)}
+
+/* ── loading and failure ─────────────────────────── */
+/* The skeleton mirrors the real layout so the page does not jump when data
+   lands — the funnel card and the stat stack keep their footprint. */
+.skel{background:var(--raise);border-radius:10px;position:relative;overflow:hidden}
+.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--text) 6%,transparent),transparent);
+  animation:sweep 1.3s infinite}
+@keyframes sweep{to{transform:translateX(100%)}}
+.fail{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:26px 24px;
+  box-shadow:var(--shadow);max-width:620px}
+.fail h3{font-size:19px;font-weight:700;letter-spacing:-.02em;margin-bottom:8px}
+.fail p{font-size:14px;color:var(--mute);line-height:1.6;margin-bottom:6px}
+.fail code{background:var(--raise);border-radius:6px;padding:2px 7px;font-size:13px;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--text)}
+.fail .acts{margin-top:16px;display:flex;gap:10px;flex-wrap:wrap}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <aside class="side">
+    <div class="brand"><span class="dot"></span><b>Reistor</b></div>
+    <nav id="nav"></nav>
+    <div class="sidefoot" id="sidefoot"></div>
+  </aside>
+  <main id="main"></main>
+</div>
+
+<script>
+/* ──────────────────────────────────────────────────────────────────────
+   Configuration.
+
+   The server rewrites these placeholders when it serves the page. Opening
+   this file straight off disk leaves them intact, which is the signal to
+   fall back to the bundled sample — so a designer can work on the page with
+   no backend running at all.
+   ────────────────────────────────────────────────────────────────────── */
+const CFG = {
+  token:  '__TOKEN__',
+  apiBase:'__API_BASE__',
+  days:   Number('__DAYS__') || 30,
+  phone:  '__PHONE__',
+};
+const LIVE = !CFG.token.startsWith('__');
+
+/* ── formatting, matching the server exactly ─────── */
+function inr(amount){
+  const digits = String(Math.round(amount));
+  if (digits.length <= 3) return '₹' + digits;
+  const last3 = digits.slice(-3);
+  const rest  = digits.slice(0, -3);
+  return '₹' + rest.replace(/\B(?=(\d{2})+(?!\d))/g, ',') + ',' + last3;
+}
+const esc = s => String(s == null ? '' : s)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const n = x => Number(x || 0).toLocaleString('en-IN');
+const day = s => s ? new Date(s).toLocaleDateString('en-IN',
+  { day:'numeric', month:'short' }) : '—';
+const when = s => s ? new Date(s).toLocaleString('en-IN',
+  { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' }) : '—';
+/* A product with no recorded name falls back to its id, which is a Shopify
+   number. Shown only until the logger has seen the product once. */
+const pname = p => p.title || ('Product ' + p.productId);
+
+const HUE = ['--peri','--lav','--mauve','--pink','--gold','--yellow','--peri','--lav'];
+
+/* ── theme ───────────────────────────────────────── */
+/* Remembered per browser. Absent, the OS preference wins — which is why the
+   attribute is only ever set when somebody has actually chosen. */
+const THEME_KEY = 'reistor.theme';
+function applyTheme(t){
+  if (t) document.documentElement.setAttribute('data-theme', t);
+  else document.documentElement.removeAttribute('data-theme');
+}
+applyTheme(localStorage.getItem(THEME_KEY));
+function toggleTheme(){
+  const now = document.documentElement.getAttribute('data-theme');
+  const isDark = now ? now === 'dark'
+    : !window.matchMedia('(prefers-color-scheme: light)').matches;
+  const next = isDark ? 'light' : 'dark';
+  localStorage.setItem(THEME_KEY, next);
+  applyTheme(next);
+}
+
+/* ── sidebar ─────────────────────────────────────── */
+const ICON = {
+  funnel:'<path d="M2 3h14L11 9v6l-4 2V9z"/>',
+  sales:'<path d="M3 15V8M9 15V3M15 15v-5"/>',
+  health:'<path d="M2 9h3l2-5 3 10 2-5h4"/>',
+  stock:'<path d="M3 6l6-3 6 3v7l-6 3-6-3z"/><path d="M3 6l6 3 6-3M9 9v7"/>',
+  reach:'<circle cx="9" cy="9" r="6"/><path d="M9 3v6l4 2"/>',
+  grid:'<path d="M3 3h5v5H3zM10 3h5v5h-5zM3 10h5v5H3zM10 10h5v5h-5z"/>',
+  stop:'<circle cx="9" cy="9" r="6"/><path d="M7 7l4 4M11 7l-4 4"/>',
+};
+const NAV = [
+  ['funnel','Funnel','#funnel'], ['sales','Sales','#sales'],
+  ['health','Account health','#health'], ['stock','Restock list','#kan'],
+  ['reach','Campaigns','#kan'], ['grid','Demand vs catalog','#demand'],
+  ['stop','Where they stopped','#stopped'],
+];
+document.getElementById('nav').innerHTML =
+  '<div class="navlab">This report</div>' +
+  NAV.map(([k,l,h],i) => `<a href="${h}" class="${i===0?'on':''}">
+    <svg viewBox="0 0 18 18" stroke-linecap="round" stroke-linejoin="round">${ICON[k]}</svg>
+    ${l}</a>`).join('');
+
+/* ── loading ─────────────────────────────────────── */
+function skeleton(){
+  document.getElementById('sidefoot').textContent = 'Loading…';
+  document.getElementById('main').innerHTML = `
+    <div class="topbar">
+      <div class="range skel" style="height:52px;border:0"></div>
+      <span class="chip skel" style="width:96px;height:38px;border:0"></span>
+      <span class="chip skel" style="width:96px;height:38px;border:0"></span>
+    </div>
+    <div class="grid">
+      <section class="card c8"><div class="skel" style="height:22px;width:120px"></div>
+        <div class="fn">${Array.from({length:8}, () => `<div class="frow">
+          <span class="skel" style="height:14px"></span>
+          <span class="skel" style="height:30px"></span>
+          <span class="skel" style="height:14px"></span>
+          <span class="skel" style="height:14px"></span></div>`).join('')}</div>
+      </section>
+      <div class="stack">
+        <div class="stat"><div class="skel" style="height:16px;width:70px"></div>
+          <div class="skel" style="height:34px;width:120px;margin-top:12px"></div></div>
+        <div class="stat"><div class="skel" style="height:16px;width:70px"></div>
+          <div class="skel" style="height:34px;width:150px;margin-top:12px"></div></div>
+      </div>
+      <section class="card c7"><div class="skel" style="height:150px"></div></section>
+      <section class="card c5"><div class="skel" style="height:150px"></div></section>
+    </div>`;
+}
+
+/* ── failure ─────────────────────────────────────── */
+/* Every message names the fix. A dashboard that says only "Error" sends
+   somebody to read server logs for something a sentence could have solved. */
+function failure(title, body, showRetry){
+  document.getElementById('sidefoot').textContent = 'Not connected';
+  document.getElementById('main').innerHTML = `<div class="fail">
+    <h3>${esc(title)}</h3>
+    <p>${body}</p>
+    <div class="acts">
+      ${showRetry ? '<button class="btn" type="button" id="retry">Try again</button>' : ''}
+      <button class="btn ghost" type="button" id="themebtn">Switch theme</button>
+    </div>
+  </div>`;
+  const r = document.getElementById('retry');
+  if (r) r.onclick = () => load();
+  document.getElementById('themebtn').onclick = toggleTheme;
+}
+
+/* ── fetch ───────────────────────────────────────── */
+let STATE = { days: CFG.days, phone: CFG.phone };
+
+async function fetchData(){
+  if (!LIVE){
+    // Opened from disk. Use the bundled sample so the design is workable
+    // without a server; SAMPLE is appended by the build.
+    if (typeof SAMPLE === 'undefined') throw new Error('no sample bundled');
+    return SAMPLE;
+  }
+
+  const qs = new URLSearchParams({ token: CFG.token, days: String(STATE.days) });
+  if (STATE.phone) qs.set('phone', STATE.phone);
+
+  const res = await fetch(`${CFG.apiBase}?${qs}`, { headers:{ accept:'application/json' } });
+
+  if (res.status === 403){
+    const e = new Error('forbidden'); e.code = 403; throw e;
+  }
+  if (res.status === 503){
+    // The body names the missing configuration — far more useful than
+    // "unavailable", so it is shown rather than summarised.
+    const e = new Error(await res.text()); e.code = 503; throw e;
+  }
+  if (!res.ok){
+    const e = new Error(`HTTP ${res.status}`); e.code = res.status; throw e;
+  }
+  return res.json();
+}
+
+async function load(){
+  skeleton();
+  try {
+    paint(await fetchData());
+  } catch (err) {
+    if (err && err.code === 403){
+      failure('Wrong access token',
+        'The dashboard token in this link is not accepted. Open the dashboard from the ' +
+        'link that carries the current <code>DASHBOARD_TOKEN</code>.', false);
+    } else if (err && err.code === 503){
+      failure('The backend is not configured yet',
+        esc(err.message || '') + '<br><br>Set the missing values and redeploy; nothing here ' +
+        'needs changing.', true);
+    } else {
+      failure('Could not reach the dashboard API',
+        'The request failed before any data came back — usually the server is down or the ' +
+        'network dropped. <code>' + esc(err && err.message || 'unknown') + '</code>', true);
+    }
+  }
+}
+
+/* ── paint ───────────────────────────────────────── */
+function paint(DATA){
+
+document.getElementById('sidefoot').innerHTML =
+  `Window ${day(DATA.range.from)} – ${day(DATA.range.to)}<br>` +
+  `Generated ${when(DATA.generatedAt)}` +
+  (DATA.range.phoneNumberId ? `<br>Number …${esc(String(DATA.range.phoneNumberId).slice(-6))}` : '') +
+  (LIVE ? '' : '<br><b>Sample data</b> — not connected');
+
+/* ── the two alarm states, and only these two ────── */
+const broken = (DATA.health.templates || []).filter(t =>
+  t.status === 'PAUSED' || t.status === 'DISABLED' || t.quality === 'RED');
+const bleeding = (DATA.funnel || []).filter(f => f.lostPct >= 50);
+
+const alertHTML = broken.length ? `<div class="alert">
+  <span class="ai">!</span>
+  <div><h4>${broken.length === 1 ? 'A template is not sending' : broken.length + ' templates are not sending'}</h4>
+    <p>${broken.map(t => `<b>${esc(t.name)}</b> — ${esc(t.status)}${
+      t.quality ? ' · quality ' + esc(t.quality) : ''}`).join(' &nbsp;·&nbsp; ')}.
+      The entry flow is broken right now and someone has to act today.</p></div>
+</div>` : '';
+
+/* ── funnel ──────────────────────────────────────── */
+/* Not `top` — that is already `window.top` on a page, and redeclaring it with
+   const throws before a single tile renders. */
+const peak = DATA.funnel.length ? DATA.funnel[0].sessions : 1;
+const funnelHTML = `<section class="card c8" id="funnel">
+  <div class="ch"><h3>Funnel</h3>
+    <span class="pill">${n(DATA.funnel[0] ? DATA.funnel[0].sessions : 0)} chats · last ${
+      Math.round((new Date(DATA.range.to) - new Date(DATA.range.from)) / 864e5)} days</span></div>
+  ${peak ? `<div class="fn">
+    ${DATA.funnel.map((f, i) => {
+      const hot = f.lostPct >= 50;
+      const w = peak ? Math.max(1.5, f.sessions / peak * 100) : 0;
+      return `<div class="frow${hot ? ' hot' : ''}">
+        <span class="flab" title="${esc(f.label)}">${esc(f.label)}</span>
+        <span class="ftrack"><span class="fbar" style="width:${w}%;
+          background:var(${HUE[i % HUE.length]})"></span></span>
+        <span class="fnum">${n(f.sessions)}</span>
+        <span class="flost${hot ? ' hot' : ''}">${i === 0 ? '' : '−' + f.lostPct + '%'}</span>
+      </div>`;
+    }).join('')}
+  </div>` : `<div class="empty" style="margin-top:16px">No chats in this window yet. The funnel
+    fills the moment somebody messages the number — it comes from live webhooks, not the nightly
+    job.</div>`}
+  ${bleeding.length ? `<div class="note" style="color:var(--bad)">
+    Biggest drop at <b>${esc(bleeding[0].label)}</b> — ${bleeding[0].lostPct}% of the previous
+    step lost here.</div>` : ''}
+  <div class="note">“Opened a product” — opening a product page fires no webhook. Counted from
+    shoppers who reached sizing or sent a cart.</div>
+</section>`;
+
+/* ── sales ───────────────────────────────────────── */
+const R = DATA.revenue;
+const convPct = DATA.funnel.length && DATA.funnel[0].sessions
+  ? (R.orders / DATA.funnel[0].sessions * 100).toFixed(1) : null;
+const salesHTML = `<div class="stack" id="sales">
+  <div class="stat">
+    <span class="sl">Orders</span>
+    <div class="sv"><span class="sn">${n(R.orders)}</span>
+      ${convPct !== null ? `<span class="badge">${convPct}% of chats</span>` : ''}</div>
+  </div>
+  <div class="stat">
+    <span class="sl">Revenue</span>
+    <div class="sv"><span class="sn">${inr(R.revenueINR)}</span>
+      <span class="badge">${inr(R.averageOrderINR)} avg</span></div>
+    <div class="note">${R.costPerOrder === null ? 'Billed messages per order not available yet.'
+      : n(R.costPerOrder) + ' billed messages per order — messages, not rupees.'}</div>
+  </div>
+</div>`;
+
+/* ── health ──────────────────────────────────────── */
+const H = DATA.health;
+const healthHTML = `<section class="card c7" id="health">
+  <div class="ch"><h3>Account health</h3>
+    <span class="pill">read ${when(H.capturedAt)}</span></div>
+  <div class="figs f3">
+    <div class="fig"><span class="fl">Quality rating</span>
+      <div style="margin-top:7px">${H.qualityRating
+        ? `<span class="qp ${H.qualityRating}"><i></i>${H.qualityRating}</span>`
+        : '<span class="fv" style="font-size:17px;color:var(--dim)">Not read yet</span>'}</div></div>
+    <div class="fig"><span class="fl">Messaging tier</span>
+      <div class="fv">${esc(H.messagingTier || '—')}</div></div>
+    <div class="fig"><span class="fl">Opted out</span>
+      <div class="fv">${n(DATA.attrition.optedOut)}</div></div>
+  </div>
+  ${(H.templates || []).length ? `<div class="tw"><table class="plain">
+    <tr><th>Template</th><th>Status</th><th class="r">Quality</th></tr>
+    ${H.templates.map(t => {
+      const bad = t.status === 'PAUSED' || t.status === 'DISABLED' || t.quality === 'RED';
+      return `<tr><td>${esc(t.name)}</td>
+        <td><span class="st ${bad ? 'no' : 'ok'}">${esc(t.status)}</span></td>
+        <td class="r">${t.quality
+          ? `<span class="qp ${esc(t.quality)}" style="font-size:11.5px;padding:4px 10px"><i></i>${esc(t.quality)}</span>`
+          : '<span style="color:var(--dim)">—</span>'}</td></tr>`;
+    }).join('')}
+  </table></div>` : '<div class="empty">No templates read yet. This lands after the nightly pull, or run /admin/pull once.</div>'}
+  <div class="note">Opted out is exact. Meta provides no block list — only the aggregate quality
+    rating above.</div>
+</section>`;
+
+/* ── delivery ────────────────────────────────────── */
+const D = DATA.delivery;
+const deliveryHTML = `<section class="card c5">
+  <div class="ch"><h3>Delivery</h3></div>
+  <div class="figs f3">
+    <div class="fig"><span class="fl">Sent</span><div class="fv">${n(D.sent)}</div></div>
+    <div class="fig"><span class="fl">Delivered</span><div class="fv">${D.deliveredPct}%</div></div>
+    <div class="fig"><span class="fl">Read</span><div class="fv">${D.readPct}%</div></div>
+    <div class="fig"><span class="fl">Failed</span>
+      <div class="fv" style="color:${D.failed ? 'var(--bad)' : 'inherit'}">${n(D.failed)}</div></div>
+    <div class="fig"><span class="fl">Billable</span>
+      <div class="fv">${n(DATA.cost.billableMessages)}</div></div>
+    <div class="fig"><span class="fl">Free</span>
+      <div class="fv">${n(DATA.cost.freeMessages)}</div></div>
+  </div>
+  ${(DATA.cost.byCategory || []).length ? `<div class="tw"><table class="plain two">
+    ${DATA.cost.byCategory.map(c => `<tr><td style="text-transform:capitalize">${esc(c.category)}</td>
+      <td class="r">${n(c.messages)}</td></tr>`).join('')}
+  </table></div>` : ''}
+  <div class="note">Read rate is a floor, not a true rate — a shopper with read receipts off never
+    reports a read.${DATA.cost.billableMessages === 0
+      ? ' A test number never bills; these stay at zero until launch.' : ''}</div>
+</section>`;
+
+/* ── kanban row ──────────────────────────────────── */
+const LD = DATA.lostDemand || [], TP = DATA.topProducts || [],
+      PC = DATA.productConversion || [], CM = DATA.campaigns || [];
+
+const kanHTML = `<div class="kan card" id="kan" style="padding:22px">
+  <div class="col">
+    <div class="colh"><h4>Restock list</h4><span>${LD.length}</span></div>
+    ${LD.length ? LD.map(l => `<div class="mini">
+      <div class="tags"><span class="tag ${l.size === null ? 'bad' : 'gold'}">${
+        l.size === null ? 'every size gone' : 'size ' + esc(l.size)}</span></div>
+      <b class="mt">${esc(pname(l))}</b>
+      <div class="mrow"><span>Shoppers turned away</span><b>${n(l.times)}</b></div>
+      <div class="mfoot"><span>last ${day(l.lastAt)}</span></div>
+    </div>`).join('')
+    : '<div class="empty">Nothing sold out on a shopper yet. This fills as soon as somebody reaches sizing and the size is gone.</div>'}
+    <div class="note">Demand you could not serve — not a failure log.</div>
+  </div>
+
+  <div class="col">
+    <div class="colh"><h4>Top sellers</h4><span>${TP.length}</span></div>
+    ${TP.length ? TP.map(p => `<div class="mini">
+      <div class="tags"><span class="tag lav">${n(p.unitsSold)} sold</span></div>
+      <b class="mt">${esc(p.title)}</b>
+      <div class="mrow"><span>Revenue</span><b>${inr(p.revenueINR)}</b></div>
+      <div class="mrow"><span>Orders</span><b>${n(p.orders)}</b></div>
+      <div class="mfoot"><span>last ${day(p.lastSoldAt)}</span></div>
+    </div>`).join('')
+    : '<div class="empty">No sales recorded yet. Revenue comes from the nightly job, so this lands a day after the funnel does.</div>'}
+  </div>
+
+  <div class="col">
+    <div class="colh"><h4>Conversion</h4><span>${PC.length}</span></div>
+    ${PC.length ? PC.map(p => {
+      const shown = p.timesShown || 1;
+      const a = p.timesSized / shown * 100, b = p.unitsSold / shown * 100;
+      return `<div class="mini">
+        <div class="tags"><span class="tag ${p.conversionPct >= 5 ? 'lav' : 'pink'}">${
+          p.conversionPct}%</span></div>
+        <b class="mt">${esc(pname(p))}</b>
+        <div class="mrow"><span>Shown</span><b>${n(p.timesShown)}</b></div>
+        <div class="mrow"><span>Reached sizing</span><b>${n(p.timesSized)}</b></div>
+        <div class="mrow"><span>Sold</span><b>${n(p.unitsSold)}</b></div>
+        <span class="spark">
+          <i style="width:${b}%;background:var(--lav)"></i>
+          <i style="width:${Math.max(0,a-b)}%;background:var(--peri)"></i>
+        </span>
+      </div>`;
+    }).join('')
+    : '<div class="empty">No conversion data yet. Needs both a shown-count and an order against the same product.</div>'}
+  </div>
+
+  <div class="col">
+    <div class="colh"><h4>Campaigns</h4><span>${CM.length}</span></div>
+    ${CM.length ? CM.map(c => `<div class="mini">
+      <div class="tags"><span class="tag pink">${c.readPct}% read</span>
+        <span class="tag lav">${c.clickPct}% clicked</span></div>
+      <b class="mt">${esc(c.templateName)}</b>
+      <div class="mrow"><span>Sent</span><b>${n(c.sent)}</b></div>
+      <div class="mrow"><span>Delivered</span><b>${n(c.delivered)}</b></div>
+      <div class="mfoot"><span>rates measured against delivered</span></div>
+    </div>`).join('')
+    : '<div class="empty">No template data yet. Meta keeps read and click counts for only 7 days, so this fills in once the nightly pull has run.</div>'}
+  </div>
+</div>`;
+
+/* ── demand vs catalog ───────────────────────────── */
+const OCC = ['work','vacation','casual','dinner','lounge'];
+const CAT = ['tops','dresses','bottoms','jackets','jumpsuits','coords'];
+const cellOf = {};
+(DATA.demandGrid || []).forEach(c => cellOf[c.occasion + '|' + c.category] = c);
+const maxReq = Math.max(1, ...(DATA.demandGrid || []).map(c => c.requests));
+
+const demandHTML = `<section class="card c7" id="demand">
+  <div class="ch"><h3>Demand vs catalog</h3>
+    <span class="pill">what they asked for</span></div>
+  <div class="heat"><table>
+    <tr><th class="rh"></th>${CAT.map(c => `<th>${c}</th>`).join('')}</tr>
+    ${OCC.map(o => `<tr><td class="rh">${o}</td>${CAT.map(c => {
+      const cell = cellOf[o + '|' + c];
+      if (!cell) return '<td></td>';
+      const miss = cell.requests ? cell.hadNothing / cell.requests : 0;
+      const heat = 0.10 + (cell.requests / maxReq) * 0.42;
+      const bg = miss >= 0.5
+        ? `color-mix(in srgb,var(--bad) ${Math.round(heat*100)}%,transparent)`
+        : `color-mix(in srgb,var(--peri) ${Math.round(heat*100)}%,transparent)`;
+      return `<td style="background:${bg};color:var(--text)"
+        title="${cell.requests} asked · ${cell.hadNothing} had nothing · ${cell.orders} ordered">
+        ${n(cell.requests)}<span class="sm">${cell.hadNothing ? cell.hadNothing + ' empty' :
+          n(cell.orders) + ' sold'}</span></td>`;
+    }).join('')}</tr>`).join('')}
+  </table></div>
+  <div class="note">Red cells are pairs the catalogue could not answer. Blank cells were never
+    asked for in this window.</div>
+</section>`;
+
+/* ── where sessions stopped ──────────────────────── */
+const A = DATA.attrition;
+const maxDrop = Math.max(1, ...(A.droppedByStep || []).map(d => d.sessions));
+const stoppedHTML = `<section class="card c5" id="stopped">
+  <div class="ch"><h3>Where they stopped</h3></div>
+  <div class="figs">
+    <div class="fig"><span class="fl">Went quiet</span><div class="fv">${n(A.abandoned)}</div></div>
+    <div class="fig"><span class="fl">Opted out</span><div class="fv">${n(A.optedOut)}</div></div>
+  </div>
+  ${(A.droppedByStep || []).length ? `<div class="fn" style="margin-top:14px">
+    ${A.droppedByStep.map((d, i) => `<div class="frow"
+      style="grid-template-columns:96px 1fr 52px">
+      <span class="flab">${esc(d.step)}</span>
+      <span class="ftrack" style="height:22px"><span class="fbar"
+        style="width:${d.sessions / maxDrop * 100}%;background:var(${HUE[i % HUE.length]})"></span></span>
+      <span class="fnum">${n(d.sessions)}</span></div>`).join('')}
+  </div>` : '<div class="empty" style="margin-top:14px">Nobody has gone quiet yet — sessions are swept into this list 24 hours after their last message.</div>'}
+  <div class="note">“Went quiet” is inferred from 24 hours of silence — Meta sends no abandonment
+    event. Opted out is exact, and is not the same as blocked.</div>
+</section>`;
+
+/* ── controls + assembly ─────────────────────────── */
+const DAY_OPTS = [7, 30, 90, 365];
+const controlsHTML = `
+  <select class="sel" id="days" aria-label="Reporting window">
+    ${DAY_OPTS.map(d => `<option value="${d}"${d === STATE.days ? ' selected' : ''}>Last ${d} days</option>`).join('')}
+  </select>
+  <select class="sel" id="phone" aria-label="Which number">
+    <option value=""${STATE.phone === '' ? ' selected' : ''}>Live number</option>
+    <option value="all"${STATE.phone === 'all' ? ' selected' : ''}>All numbers</option>
+  </select>
+  <button class="btn ghost" type="button" id="theme" aria-label="Switch theme">Theme</button>
+  <button class="btn" type="button" id="refresh">Refresh</button>`;
+
+document.getElementById('main').innerHTML = `
+  <div class="topbar">
+    <div class="range">
+      <svg viewBox="0 0 18 18" stroke-linecap="round"><rect x="2.5" y="3.5" width="13" height="12" rx="2"/><path d="M2.5 7h13M6 2v3M12 2v3"/></svg>
+      <div><div class="r1">${day(DATA.range.from)} – ${day(DATA.range.to)}</div>
+        <div class="r2">Reistor AI Stylist · WhatsApp</div></div>
+    </div>
+    <span class="chip">Chats <b>${n(DATA.funnel[0] ? DATA.funnel[0].sessions : 0)}</b></span>
+    <span class="chip">Orders <b>${n(R.orders)}</b></span>
+    ${controlsHTML}
+  </div>
+  ${alertHTML}
+  <div class="grid">
+    ${funnelHTML}
+    ${salesHTML}
+    ${healthHTML}
+    ${deliveryHTML}
+    ${kanHTML}
+    ${demandHTML}
+    ${stoppedHTML}
+  </div>`;
+
+/* Controls re-fetch rather than reload, so the scroll position and the chosen
+   theme survive a change of window. */
+document.getElementById('days').onchange = e => { STATE.days = Number(e.target.value); load(); };
+document.getElementById('phone').onchange = e => { STATE.phone = e.target.value; load(); };
+document.getElementById('theme').onclick = toggleTheme;
+document.getElementById('refresh').onclick = e => { e.target.disabled = true; load(); };
+
+/* Rail follows the section you're reading.
+   Track a set and pick the earliest section in document order, rather than
+   letting the last callback win — the funnel and the sales stack sit side by
+   side, so at the top of the page both intersect and whichever fired last was
+   highlighting "Sales" while the reader was plainly looking at the funnel. */
+const links = [...document.querySelectorAll('#nav a')];
+const ORDER = ['funnel', 'sales', 'health', 'kan', 'demand', 'stopped'];
+const live = new Set();
+const obs = new IntersectionObserver(es => {
+  es.forEach(e => e.isIntersecting ? live.add(e.target.id) : live.delete(e.target.id));
+  const now = ORDER.find(id => live.has(id));
+  if (!now) return;
+  links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + now));
+}, { rootMargin: '-15% 0px -70% 0px' });
+ORDER.forEach(id => { const el = document.getElementById(id); if (el) obs.observe(el); });
+
+}
+
+load();
+</script>
+<!--__SAMPLE__-->
+</body>
+</html>

@@ -1,0 +1,30 @@
+{
+  // Build for Node / Linode. The Cloudflare build needs no tsconfig of its own —
+  // wrangler compiles src/index.ts directly and never emits to disk.
+  //
+  // Cloudflare's types stay in `types` because index.ts still declares the
+  // Worker entrypoint (KVNamespace, ExecutionContext). Those are type-only and
+  // erase at compile time, so nothing Cloudflare-specific reaches the Node
+  // bundle at runtime.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "rootDir": "src",
+    "declaration": false,
+    "sourceMap": true,
+    "types": ["@cloudflare/workers-types", "node"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.json"],
+  // The pre-refactor modular files: still in the repo, imported by nothing.
+  // Compiling them would put dead JavaScript in dist/ and imply it runs.
+  "exclude": [
+    "src/catalog.ts",
+    "src/env.ts",
+    "src/flow.ts",
+    "src/security.ts",
+    "src/templates.ts",
+    "src/whatsapp.ts",
+    "tests/**/*"
+  ]
+}

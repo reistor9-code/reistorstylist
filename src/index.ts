@@ -9,17 +9,46 @@
  */
 
 import Anthropic from '@anthropic-ai/sdk';
-import catalog from './products.json';
+// The `with { type: 'json' }` attribute is required by Node's ESM loader and
+// accepted by wrangler's bundler. Without it the Cloudflare build is fine and
+// the Linode build fails at startup with ERR_IMPORT_ATTRIBUTE_MISSING.
+import catalog from './products.json' with { type: 'json' };
+import { getStore, type Store, type StoreEnv } from './platform/store.js';
+import { getAnalytics, newSessionId, type FlowStep } from './analytics/log.js';
+import { shouldProcess, verifySignature } from './webhook/signature.js';
+import {
+  batchIsEmpty,
+  parseWebhook,
+  type InboundMessage,
+  type WebhookBatch,
+} from './webhook/parse.js';
+import { handleDashboard } from './dashboard/route.js';
+import { runDailyPull as runPull, type PullSummary } from './analytics/pull.js';
 
 /* ------------------------------------------------------------------ *
  * Env
  * ------------------------------------------------------------------ */
 
-export interface Env {
-  STATE: KVNamespace;
+export interface Env extends StoreEnv {
+  /** Optional now: Supabase is the preferred store, KV the fallback. */
+  STATE?: KVNamespace;
   WHATSAPP_TOKEN: string;
   PHONE_NUMBER_ID: string;
   VERIFY_TOKEN: string;
+  /**
+   * Meta App Secret, used to verify X-Hub-Signature-256 on every inbound
+   * webhook. Without it the endpoint accepts forged payloads from anyone who
+   * finds the URL, and `from` is attacker-controlled — so they can make this
+   * Worker send WhatsApp messages to arbitrary numbers on your bill.
+   */
+  APP_SECRET?: string;
+  /** WhatsApp Business Account id, for the analytics pull. */
+  WABA_ID?: string;
+  /** Shared secret guarding /dashboard. */
+  DASHBOARD_TOKEN?: string;
+  /** Analytics + portable state. Unset means the bot runs, unmeasured. */
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_KEY?: string;
   ANTHROPIC_API_KEY?: string;
   ANTHROPIC_MODEL?: string;
   GRAPH_API_VERSION?: string;
@@ -50,7 +79,7 @@ export interface Env {
  * runtime check on anything the model writes (see `copyViolations`).
  * ------------------------------------------------------------------ */
 
-const BANNED_WORDS = [
+export const BANNED_WORDS = [
   'should',
   'need',
   'needs',
@@ -75,7 +104,7 @@ function fill(template: string, values: Record<string, string>): string {
 }
 
 /** Returns a list of brand-copy problems in `text`. Empty means clean. */
-function copyViolations(text: string): string[] {
+export function copyViolations(text: string): string[] {
   const issues: string[] = [];
 
   for (const word of BANNED_WORDS) {
@@ -98,7 +127,7 @@ const COPY_RULES_PROMPT = `Copy rules — these are absolute:
 - Womenswear voice: concise, specific, warm without gushing.
 - Name the fabric when it is a natural one (hemp, linen, modal, Tencel).`;
 
-const COPY = {
+export const COPY = {
   welcome:
     "Hi there! 👋 I'm Reistor AI Stylist. I'll help you find the perfect outfit for any occasion. " +
     "Two questions and I'll put a look together for you ✨",
@@ -308,7 +337,7 @@ const SHOPIFY_CACHE_KEY = 'shopify:ind:products';
 export async function getProducts(env: Env): Promise<Product[]> {
   if (!env.IND_SHOPIFY_STORE || !env.IND_SHOPIFY_API_SECRET) return catalog as Product[];
 
-  const cached = await env.STATE.get(SHOPIFY_CACHE_KEY);
+  const cached = await stateStore(env).get(SHOPIFY_CACHE_KEY);
   if (cached) return JSON.parse(cached) as Product[];
 
   const mapped: Product[] = [];
@@ -347,7 +376,7 @@ export async function getProducts(env: Env): Promise<Product[]> {
   }
 
   console.log('[shopify:loaded]', `mapped=${mapped.length}`, `skipped=${skipped}`);
-  await env.STATE.put(SHOPIFY_CACHE_KEY, JSON.stringify(mapped), { expirationTtl: 600 });
+  await stateStore(env).put(SHOPIFY_CACHE_KEY, JSON.stringify(mapped), { expirationTtl: 600 });
   return mapped;
 }
 
@@ -363,7 +392,7 @@ const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', '5XL'
  * length, and a carousel's body is one short question, so even a single
  * per-card variable is rejected ("Parameters words ratio exceeds limit").
  */
-const OCCASIONS = [
+export const OCCASIONS = [
   {
     id: 'work',
     label: 'Work & Meeting',
@@ -401,7 +430,7 @@ const OCCASIONS = [
   },
 ] as const;
 
-const CATEGORIES = [
+export const CATEGORIES = [
   {
     id: 'tops',
     label: 'Tops',
@@ -462,7 +491,7 @@ function filterProducts(all: Product[], occasion?: string, category?: string): P
 }
 
 /** Indian digit grouping without relying on the runtime's ICU data. */
-function formatINR(amount: number): string {
+export function formatINR(amount: number): string {
   const digits = String(Math.round(amount));
   if (digits.length <= 3) return `₹${digits}`;
   const last3 = digits.slice(-3);
@@ -471,7 +500,7 @@ function formatINR(amount: number): string {
 }
 
 /** GoKwik / reistor.in checkout deep link for a specific size. */
-function checkoutUrl(product: Product, size: string): string {
+export function checkoutUrl(product: Product, size: string): string {
   const url = new URL(product.productUrl);
   url.searchParams.set('variant', size);
   url.searchParams.set('utm_source', 'whatsapp');
@@ -497,6 +526,12 @@ type Step =
 
 interface State {
   step: Step;
+  /**
+   * Analytics session this conversation belongs to. Minted on a fresh start
+   * and carried until the shopper finishes or restarts, so every event can be
+   * threaded into one journey row for the funnel.
+   */
+  sessionId?: string;
   occasion?: string;
   category?: string;
   /** Cursor into `rankedIds` for "Show More Looks". */
@@ -529,8 +564,20 @@ function freshState(): State {
   };
 }
 
+/**
+ * The storage handle for this request.
+ *
+ * Resolved per call rather than held in a module global because a Worker
+ * isolate is reused across requests and, on Node, the same process serves
+ * every shopper — a cached handle would outlive a config change either way.
+ * Construction is a couple of property reads, so this is not a hot path.
+ */
+function stateStore(env: Env): Store {
+  return getStore(env);
+}
+
 async function loadState(env: Env, waId: string): Promise<State> {
-  const raw = await env.STATE.get(`state:${waId}`);
+  const raw = await stateStore(env).get(`state:${waId}`);
   if (!raw) return freshState();
   try {
     return { ...freshState(), ...(JSON.parse(raw) as Partial<State>) };
@@ -541,20 +588,20 @@ async function loadState(env: Env, waId: string): Promise<State> {
 
 async function saveState(env: Env, waId: string, state: State): Promise<void> {
   state.updatedAt = Date.now();
-  await env.STATE.put(`state:${waId}`, JSON.stringify(state), {
+  await stateStore(env).put(`state:${waId}`, JSON.stringify(state), {
     expirationTtl: STATE_TTL_SECONDS,
   });
 }
 
 async function clearState(env: Env, waId: string): Promise<void> {
-  await env.STATE.delete(`state:${waId}`);
+  await stateStore(env).delete(`state:${waId}`);
 }
 
 /* ------------------------------------------------------------------ *
  * WhatsApp send helpers
  * ------------------------------------------------------------------ */
 
-const LIMITS = {
+export const LIMITS = {
   rowTitle: 24,
   rowDescription: 72,
   buttonTitle: 20,
@@ -566,9 +613,82 @@ const LIMITS = {
   maxButtons: 3,
 } as const;
 
-function clip(text: string, max: number): string {
+export function clip(text: string, max: number): string {
   const t = text.trim();
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
+}
+
+/* ------------------------------------------------------------------ *
+ * Send context
+ *
+ * graph() is the single funnel every outbound message passes through, which
+ * makes it the one place worth logging from. It does not, however, know which
+ * funnel step it is serving — that lives up in the router.
+ *
+ * Rather than thread a context argument through ten send helpers, route()
+ * parks the current step here keyed by recipient. Keying by wa_id is what
+ * makes it safe: a Worker isolate can serve several requests at once, but two
+ * concurrent requests are for different shoppers, and a single shopper's
+ * messages are processed serially inside one route() call. The entry is
+ * removed in route()'s finally block, so nothing leaks between requests.
+ * ------------------------------------------------------------------ */
+
+interface SendContext {
+  sessionId?: string;
+  /**
+   * The live state object, not a copied step string. `state.step` changes
+   * several times while one inbound message is handled — a shopper picking a
+   * category moves through 'category' to 'top3' — and holding a reference
+   * means each send is tagged with the step it actually belongs to rather
+   * than the step the turn opened on.
+   */
+  state?: { step: FlowStep };
+}
+
+const sendContext = new Map<string, SendContext>();
+
+function setSendContext(waId: string, ctx: SendContext): void {
+  sendContext.set(waId, ctx);
+}
+
+function clearSendContext(waId: string): void {
+  sendContext.delete(waId);
+}
+
+/** Best-effort description of an outbound payload, for the event log. */
+function describeOutbound(payload: Record<string, unknown>): {
+  messageType: string;
+  productIds?: string[];
+  templateName?: string;
+} {
+  const type = String(payload.type ?? 'unknown');
+
+  if (type === 'template') {
+    const template = payload.template as { name?: string } | undefined;
+    return { messageType: 'template', templateName: template?.name };
+  }
+
+  if (type === 'interactive') {
+    const interactive = payload.interactive as any;
+    const kind = String(interactive?.type ?? 'interactive');
+
+    if (kind === 'carousel') {
+      const cards = Array.isArray(interactive?.action?.cards) ? interactive.action.cards : [];
+      return {
+        messageType: 'carousel',
+        productIds: cards
+          .map((c: any) => c?.action?.product_retailer_id)
+          .filter((id: unknown): id is string => typeof id === 'string'),
+      };
+    }
+    if (kind === 'product') {
+      const id = interactive?.action?.product_retailer_id;
+      return { messageType: 'product', productIds: typeof id === 'string' ? [id] : undefined };
+    }
+    return { messageType: kind };
+  }
+
+  return { messageType: type };
 }
 
 async function graph(env: Env, payload: Record<string, unknown>): Promise<boolean> {
@@ -577,6 +697,10 @@ async function graph(env: Env, payload: Record<string, unknown>): Promise<boolea
   const body = { messaging_product: 'whatsapp', recipient_type: 'individual', ...payload };
 
   console.log('[outbound]', JSON.stringify(body));
+
+  const to = typeof payload.to === 'string' ? payload.to : undefined;
+  const ctx = to ? sendContext.get(to) : undefined;
+  const described = describeOutbound(payload);
 
   try {
     const res = await fetch(url, {
@@ -589,6 +713,28 @@ async function graph(env: Env, payload: Record<string, unknown>): Promise<boolea
     });
     const text = await res.text();
     console.log('[outbound:response]', res.status, text);
+
+    /*
+     * The wamid is captured here because every later delivery receipt keys off
+     * it. Without this row, a status webhook can still be counted, but it
+     * cannot be attributed to a funnel step or a product.
+     */
+    let wamid: string | undefined;
+    try {
+      wamid = JSON.parse(text)?.messages?.[0]?.id;
+    } catch {
+      /* Meta returns JSON; a non-JSON body means an edge failure. */
+    }
+
+    await getAnalytics(env).outbound({
+      waId: to,
+      wamid,
+      sessionId: ctx?.sessionId,
+      flowStep: ctx?.state?.step,
+      ok: res.ok,
+      ...described,
+    });
+
     return res.ok;
   } catch (err) {
     console.log('[outbound:error]', String(err));
@@ -842,7 +988,7 @@ function lookReason(p: Product, occasion?: string): string {
 }
 
 /** Broadest size availability first, then price. */
-function rankOrder(candidates: Product[]): Product[] {
+export function rankOrder(candidates: Product[]): Product[] {
   return [...candidates].sort((a, b) => {
     const diff = inStockSizes(b).length - inStockSizes(a).length;
     return diff !== 0 ? diff : a.priceINR - b.priceINR;
@@ -1048,6 +1194,32 @@ async function sendLooks(
     if (!state.shownLookIds.includes(product.id)) state.shownLookIds.push(product.id);
   }
 
+  // Recorded per round rather than per session, so "shown" in the conversion
+  // report counts every look that actually reached a shopper's screen.
+  if (products.length) {
+    const analytics = getAnalytics(env);
+
+    // Names for the dashboard. Captured on every round, so a product that is
+    // shown but never sold still has something readable to display.
+    await analytics.rememberProducts(
+      products.map((p) => ({ id: p.id, title: p.title, priceINR: p.priceINR })),
+    );
+
+    await analytics.milestone('looks_shown', {
+      waId: to,
+      sessionId: state.sessionId,
+      flowStep: state.step,
+      productIds: ids.length ? ids : products.map((p) => p.id),
+      meta: { round: Math.floor(state.offset / 3) + 1, viaProductMessage: sentAsProduct },
+    });
+    if (state.sessionId) {
+      await analytics.patchSession(state.sessionId, {
+        looksShown: products.length,
+        productsShown: products.map((p) => p.id),
+      });
+    }
+  }
+
   state.offset += slice.length;
   return slice.length;
 }
@@ -1064,7 +1236,7 @@ async function sendLooks(
  *
  * Only returns empty if nothing in the catalog is in stock at all.
  */
-function widenCandidates(
+export function widenCandidates(
   all: Product[],
   occasion?: string,
   category?: string,
@@ -1111,6 +1283,23 @@ async function runBackend(env: Env, to: string, state: State): Promise<void> {
       { id: 'act:stylist', title: 'Talk to Stylist' },
     ]);
     return;
+  }
+
+  /*
+   * A widened brief means the catalog had nothing for the exact pair the
+   * shopper asked for. Recorded because it is a merchandising signal, not an
+   * error: a high rate for one occasion x category cell says stock that cell.
+   */
+  if (intro) {
+    await getAnalytics(env).milestone('widened', {
+      waId: to,
+      sessionId: state.sessionId,
+      flowStep: state.step,
+      meta: { occasion: state.occasion, category: state.category },
+    });
+    if (state.sessionId) {
+      await getAnalytics(env).patchSession(state.sessionId, { widened: true });
+    }
   }
 
   const ranking = rankLooks(candidates, state.occasion);
@@ -1188,6 +1377,23 @@ async function askSize(env: Env, to: string, state: State, product: Product): Pr
   const sizes = inStockSizes(product);
 
   if (sizes.length === 0) {
+    /*
+     * Demand the catalog could not meet. This is the single most actionable
+     * number the bot produces — a shopper who reached sizing had already
+     * chosen, so every row here is a sale lost to stock rather than to
+     * interest, and it names the product to restock.
+     */
+    await getAnalytics(env).rememberProducts([
+      { id: product.id, title: product.title, priceINR: product.priceINR },
+    ]);
+    await getAnalytics(env).milestone('size_sold_out', {
+      waId: to,
+      sessionId: state.sessionId,
+      flowStep: 'size',
+      productIds: [product.id],
+      meta: { title: product.title, priceINR: product.priceINR, allSizesGone: true },
+    });
+
     await sendButtons(env, to, `${product.title} is out of stock in every size right now.`, [
       { id: 'act:more', title: 'Show More Looks' },
       { id: 'act:browse', title: 'Browse Category' },
@@ -1219,6 +1425,27 @@ async function sendCheckout(
   state.step = 'checkout';
   state.currentLookId = product.id;
 
+  /*
+   * The last step the bot can observe. Everything past this happens on GoKwik,
+   * which a Worker cannot see — so the order itself is learned later from
+   * Shopify, matched on the UTMs checkoutUrl() stamps here.
+   */
+  if (state.sessionId) {
+    await getAnalytics(env).patchSession(state.sessionId, {
+      checkoutOpened: true,
+      productPicked: product.id,
+      sizePicked: size,
+    });
+  }
+  await getAnalytics(env).milestone('checkout_opened', {
+    waId: to,
+    sessionId: state.sessionId,
+    flowStep: 'checkout',
+    productIds: [product.id],
+    size,
+    meta: { priceINR: product.priceINR },
+  });
+
   await sendCtaUrl(
     env,
     to,
@@ -1230,6 +1457,19 @@ async function sendCheckout(
 }
 
 async function confirmOrder(env: Env, to: string, state: State): Promise<void> {
+  /*
+   * Self-reported, not verified. The shopper tapping "Order Placed" is the
+   * only in-chat completion signal available, so it is recorded as a milestone
+   * rather than as revenue — the authoritative order comes from the Shopify
+   * pull, and the dashboard's revenue figures use that.
+   */
+  await getAnalytics(env).milestone('order_claimed', {
+    waId: to,
+    sessionId: state.sessionId,
+    flowStep: 'done',
+    productIds: state.currentLookId ? [state.currentLookId] : undefined,
+  });
+
   state.step = 'done';
   await sendButtons(env, to, COPY.orderConfirmed, [
     { id: 'act:again', title: 'Browse Again' },
@@ -1341,6 +1581,8 @@ interface Inbound {
   messageId: string;
   text?: string;
   replyId?: string;
+  /** From the webhook's `contacts` block, for the shopper record. */
+  profileName?: string;
 }
 
 const STYLIST_OPENERS: Record<string, string> = {
@@ -1352,6 +1594,31 @@ const STYLIST_OPENERS: Record<string, string> = {
 async function route(env: Env, msg: Inbound): Promise<void> {
   const to = msg.waId;
   const state = await loadState(env, to);
+  const analytics = getAnalytics(env);
+
+  /*
+   * A session is the unit the funnel counts, so one is minted whenever a
+   * conversation genuinely begins — no session yet, or the last one ended. It
+   * is carried in state, which means every event this turn produces threads
+   * into the same journey row.
+   */
+  const startingFresh = !state.sessionId || state.step === 'done';
+  if (startingFresh) {
+    state.sessionId = newSessionId();
+    await analytics.openSession(state.sessionId, to);
+  }
+
+  setSendContext(to, { sessionId: state.sessionId, state });
+
+  await analytics.inbound({
+    waId: to,
+    wamid: msg.messageId,
+    sessionId: state.sessionId,
+    flowStep: state.step,
+    messageType: msg.replyId ? 'interactive' : 'text',
+    payloadId: msg.replyId,
+    profileName: msg.profileName,
+  });
 
   try {
     if (msg.replyId) {
@@ -1360,6 +1627,22 @@ async function route(env: Env, msg: Inbound): Promise<void> {
       await handleText(env, to, state, msg.text);
     }
   } finally {
+    /*
+     * The session row is patched from the state the turn ended in, so the
+     * funnel reflects where the shopper actually got to rather than where they
+     * started. This runs in `finally` for the same reason saveState does — a
+     * mid-flow error must not lose the progress already made.
+     */
+    if (state.sessionId) {
+      await analytics.patchSession(state.sessionId, {
+        occasion: state.occasion,
+        category: state.category,
+        lastStep: state.step,
+        productPicked: state.currentLookId,
+        stylistUsed: state.mode === 'stylist' ? true : undefined,
+      });
+    }
+    clearSendContext(to);
     await saveState(env, to, state);
   }
 }
@@ -1800,7 +2083,7 @@ async function shopifyAccessToken(env: Env, force = false): Promise<string | nul
   if (!env.IND_SHOPIFY_API_KEY || !secret) return null;
 
   if (!force) {
-    const cached = await env.STATE.get(SHOPIFY_TOKEN_KEY);
+    const cached = await stateStore(env).get(SHOPIFY_TOKEN_KEY);
     if (cached) return cached;
   }
 
@@ -1828,7 +2111,7 @@ async function shopifyAccessToken(env: Env, force = false): Promise<string | nul
 
   // KV needs at least 60s; expires_in is seconds and typically ~86400.
   const ttl = Math.max(60, (body.expires_in ?? 86_400) - SHOPIFY_TOKEN_MARGIN_S);
-  await env.STATE.put(SHOPIFY_TOKEN_KEY, body.access_token, { expirationTtl: ttl });
+  await stateStore(env).put(SHOPIFY_TOKEN_KEY, body.access_token, { expirationTtl: ttl });
   console.log('[shopify:token-minted]', `expires_in=${body.expires_in}`, `cached_for=${ttl}s`);
 
   return body.access_token;
@@ -2235,59 +2518,138 @@ async function createCarouselTemplates(env: Env, waba: string, appId: string, su
  * Webhook parsing
  * ------------------------------------------------------------------ */
 
-function parseInbound(body: any): Inbound | null {
-  const value = body?.entry?.[0]?.changes?.[0]?.value;
-  if (!value) return null;
+/**
+ * Records everything in the batch that is not a shopper message.
+ *
+ * Delivery receipts, opt-outs, template pauses and account alerts all arrive
+ * here and none of them route into the conversation. They used to be logged to
+ * the console and dropped — which threw away, among other things, the pricing
+ * object that is the only per-message cost data Meta ever hands over.
+ */
+async function recordNonMessageEvents(env: Env, batch: WebhookBatch): Promise<void> {
+  const analytics = getAnalytics(env);
 
-  // Delivery / read receipts arrive on the same webhook field — ignore them.
-  if (!Array.isArray(value.messages) || value.messages.length === 0) {
-    if (value.statuses) console.log('[inbound:status]', JSON.stringify(value.statuses));
-    return null;
+  for (const status of batch.statuses) {
+    await analytics.status(status);
   }
 
-  const message = value.messages[0];
-  const waId: string | undefined = message.from;
-  const messageId: string | undefined = message.id;
-  if (!waId || !messageId) return null;
-
-  if (message.type === 'text') {
-    return { waId, messageId, text: String(message.text?.body ?? '') };
+  for (const optOut of batch.optOuts) {
+    // Policy requires honouring this. The flag it sets is what any future
+    // marketing send has to consult before going out.
+    console.log('[optout]', optOut.waId, optOut.value);
+    await analytics.optOut(optOut.waId, optOut.value, optOut.timestamp);
   }
 
-  if (message.type === 'interactive') {
-    const replyId =
-      message.interactive?.list_reply?.id ?? message.interactive?.button_reply?.id ?? undefined;
-    if (replyId) return { waId, messageId, replyId: String(replyId) };
-    return null;
+  for (const evt of batch.templateEvents) {
+    console.log('[template]', evt.name, evt.event);
+    await analytics.templateStatus(evt.name, evt.event, evt.meta);
   }
 
-  if (message.type === 'button') {
-    // Template quick-reply buttons (carousel cards included) land here rather
-    // than under `interactive`. The routing id is in `payload`; `text` is only
-    // the visible button label.
-    const payload = message.button?.payload;
-    if (payload) return { waId, messageId, replyId: String(payload) };
-    return { waId, messageId, text: String(message.button?.text ?? '') };
+  for (const evt of batch.accountEvents) {
+    console.log('[account]', evt.type, JSON.stringify(evt.meta));
+    await analytics.accountEvent(evt.type, evt.meta);
+  }
+}
+
+/**
+ * Turns a parsed webhook message into what the router expects.
+ *
+ * A cart (`type: "order"`) is the one case worth calling out: it is the only
+ * webhook Meta sends that proves a shopper engaged with a product card, since
+ * opening the product page itself fires nothing at all. It is recorded as a
+ * milestone and then treated as free text, so the stylist can pick the
+ * conversation up rather than the shopper hitting silence.
+ */
+async function toInbound(env: Env, msg: InboundMessage): Promise<Inbound | null> {
+  if (msg.order) {
+    await getAnalytics(env).milestone('cart_sent', {
+      waId: msg.waId,
+      productIds: msg.order.items.map((i) => i.retailerId),
+      meta: {
+        catalogId: msg.order.catalogId,
+        items: msg.order.items,
+        total: msg.order.items.reduce((sum, i) => sum + i.price * i.quantity, 0),
+      },
+    });
+    return {
+      waId: msg.waId,
+      messageId: msg.messageId,
+      profileName: msg.profileName,
+      text: msg.text ?? '',
+    };
   }
 
-  console.log('[inbound:unsupported-type]', message.type);
-  return { waId, messageId, text: '' };
+  if (msg.replyId) {
+    return {
+      waId: msg.waId,
+      messageId: msg.messageId,
+      profileName: msg.profileName,
+      replyId: msg.replyId,
+    };
+  }
+
+  if (msg.text !== undefined) {
+    return {
+      waId: msg.waId,
+      messageId: msg.messageId,
+      profileName: msg.profileName,
+      text: msg.text,
+    };
+  }
+
+  // Images, audio, location, reactions. Logged by the caller, not routed —
+  // there is no branch in the flow that acts on them.
+  console.log('[inbound:unroutable-type]', msg.messageType);
+  return null;
 }
 
 /** Meta retries webhooks; swallow a repeat of a message id we already ran. */
 async function alreadyHandled(env: Env, messageId: string): Promise<boolean> {
   const key = `msg:${messageId}`;
-  if (await env.STATE.get(key)) return true;
-  await env.STATE.put(key, '1', { expirationTtl: 600 });
+  const store = stateStore(env);
+  if (await store.get(key)) return true;
+  await store.put(key, '1', { expirationTtl: 600 });
   return false;
 }
 
+/**
+ * The nightly analytics pull, with this file's Graph and Shopify clients
+ * injected.
+ *
+ * pull.ts declares what it needs rather than importing it, because both
+ * clients live here — importing them back would make the module graph
+ * circular. Exported so server.ts can drive the same job from node-cron.
+ */
+export function runDailyPull(env: Env): Promise<PullSummary> {
+  return runPull(env, {
+    graphCall: (path) => graphCall(env, path),
+    shopifyFetch: (path) => shopifyFetch(env, path),
+  });
+}
+
 /* ------------------------------------------------------------------ *
- * Worker entrypoint
+ * Request handling — platform neutral
+ *
+ * The whole HTTP surface lives in handleRequest(), which takes a standard
+ * Request and returns a standard Response. Cloudflare calls it from the fetch
+ * handler at the bottom of this file; Node calls it from src/server.ts through
+ * a small Express adapter. Neither knows about the other, and the routing,
+ * flow and admin code below is shared verbatim.
+ *
+ * `background` is the one capability that genuinely differs between the two.
+ * On Cloudflare it is ctx.waitUntil, which keeps the isolate alive after the
+ * response is sent. On Node the process is already long-lived, so it is a
+ * plain fire-and-forget with a catch attached.
  * ------------------------------------------------------------------ */
 
-export default {
-  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+export type Background = (promise: Promise<unknown>) => void;
+
+export async function handleRequest(
+  request: Request,
+  env: Env,
+  background: Background,
+): Promise<Response> {
+  {
     const url = new URL(request.url);
     // Tolerate a trailing slash — "/webhook/" is an easy thing to paste into Meta.
     const path = url.pathname.replace(/\/+$/, '') || '/';
@@ -2296,6 +2658,27 @@ export default {
       return new Response('Reistor AI Stylist is running. Webhook lives at /webhook.', {
         status: 200,
       });
+    }
+
+    /*
+     * Liveness probe for systemd and any uptime monitor. Deliberately touches
+     * no external service, so a Meta or Shopify outage cannot make the process
+     * look dead and trigger a restart loop.
+     */
+    if (path === '/health' && request.method === 'GET') {
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          store: env.SUPABASE_URL ? 'supabase' : env.STATE ? 'kv' : 'memory',
+          signatureVerification: env.APP_SECRET ? 'on' : 'OFF',
+          analytics: env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY ? 'on' : 'off',
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      );
+    }
+
+    if (path === '/dashboard' || path.startsWith('/dashboard/')) {
+      return handleDashboard(request, env, path);
     }
 
     /*
@@ -2498,7 +2881,7 @@ export default {
       if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
         return new Response('Forbidden', { status: 403 });
       }
-      if (url.searchParams.get('fresh') === '1') await env.STATE.delete(SHOPIFY_CACHE_KEY);
+      if (url.searchParams.get('fresh') === '1') await stateStore(env).delete(SHOPIFY_CACHE_KEY);
 
       const all = await getProducts(env);
       const inStock = all.filter(isInStock);
@@ -2565,6 +2948,24 @@ export default {
       });
     }
 
+    /*
+     * Runs the nightly pull by hand. Useful on the first day, when waiting for
+     * 02:30 to find out whether the Shopify credentials work is not a good use
+     * of an evening.
+     *
+     *   /admin/pull?token=<VERIFY_TOKEN>
+     */
+    if (path === '/admin/pull' && request.method === 'GET') {
+      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      const summary = await runDailyPull(env);
+      return new Response(JSON.stringify(summary, null, 2), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
     if (path !== '/webhook') {
       return new Response('Not found', { status: 404 });
     }
@@ -2586,26 +2987,54 @@ export default {
       return new Response('Method not allowed', { status: 405 });
     }
 
+    /*
+     * The body is read as TEXT first, then parsed.
+     *
+     * Signature verification runs over the exact bytes Meta sent. Parsing the
+     * JSON and re-serialising it changes key order and whitespace, so the HMAC
+     * would never match — reading text once and parsing from the string is the
+     * only order that works.
+     */
+    const rawBody = await request.text();
+
+    const outcome = await verifySignature(
+      env.APP_SECRET,
+      request.headers.get('x-hub-signature-256'),
+      rawBody,
+    );
+    if (!shouldProcess(outcome)) {
+      // 403 rather than 200: a forged payload is not an event to acknowledge.
+      return new Response('Forbidden', { status: 403 });
+    }
+
     let body: unknown;
     try {
-      body = await request.json();
+      body = JSON.parse(rawBody);
     } catch {
       console.log('[inbound:bad-json]');
       return new Response('EVENT_RECEIVED', { status: 200 });
     }
 
-    console.log('[inbound]', JSON.stringify(body));
+    console.log('[inbound]', rawBody);
 
-    const msg = parseInbound(body);
-    if (msg) {
-      ctx.waitUntil(
+    const batch = parseWebhook(body);
+
+    if (!batchIsEmpty(batch)) {
+      background(
         (async () => {
-          if (await alreadyHandled(env, msg.messageId)) {
-            console.log('[inbound:duplicate]', msg.messageId);
-            return;
-          }
           try {
-            await route(env, msg);
+            // Statuses, opt-outs, template and account events. None of these
+            // route into a conversation, and all of them are worth keeping.
+            await recordNonMessageEvents(env, batch);
+
+            for (const message of batch.messages) {
+              if (await alreadyHandled(env, message.messageId)) {
+                console.log('[inbound:duplicate]', message.messageId);
+                continue;
+              }
+              const inbound = await toInbound(env, message);
+              if (inbound) await route(env, inbound);
+            }
           } catch (err) {
             console.log('[route:error]', String(err), (err as Error)?.stack);
           }
@@ -2615,5 +3044,26 @@ export default {
 
     // Meta expects a fast 200 regardless of what happens downstream.
     return new Response('EVENT_RECEIVED', { status: 200 });
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Cloudflare entrypoint
+ *
+ * Thin by design: everything above runs unchanged on Node. The only Worker
+ * specific line is ctx.waitUntil, wrapped as `background`.
+ * ------------------------------------------------------------------ */
+
+export default {
+  fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    return handleRequest(request, env, (promise) => ctx.waitUntil(promise));
+  },
+
+  /**
+   * Daily cron. Configured under [triggers] in wrangler.toml; on Linode the
+   * same function is called by node-cron from server.ts.
+   */
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(runDailyPull(env));
   },
 } satisfies ExportedHandler<Env>;
