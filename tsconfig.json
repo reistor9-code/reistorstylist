@@ -4,7 +4,11 @@
     "lib": ["ES2022"],
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "types": ["@cloudflare/workers-types"],
+    // Both runtimes, because the project has two entrypoints: src/index.ts for
+    // Cloudflare and src/server.ts for Node. The globals do not collide, and
+    // omitting "node" makes `Buffer` and `node:http` fail to resolve in the
+    // server adapter while every other file typechecks fine.
+    "types": ["@cloudflare/workers-types", "node"],
     "resolveJsonModule": true,
     "strict": true,
     "noUnusedLocals": true,

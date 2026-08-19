@@ -23,10 +23,6 @@ export const CONFIG_KEYS = [
   'CATEGORY_TEMPLATE',
   'TEMPLATE_LANGUAGE',
 
-  // Anthropic
-  'ANTHROPIC_API_KEY',
-  'ANTHROPIC_MODEL',
-
   // Shopify (India)
   'IND_SHOPIFY_STORE',
   'IND_SHOPIFY_STORE_ID',
@@ -99,9 +95,9 @@ export function configWarnings(config: Config): string[] {
   if (!config.IND_SHOPIFY_API_SECRET) {
     warn.push('IND_SHOPIFY_API_SECRET unset — the bundled mock catalog will be used.');
   }
-  if (!config.ANTHROPIC_API_KEY) {
-    warn.push('ANTHROPIC_API_KEY unset — the stylist replies with fixed copy.');
-  }
+  // No Anthropic warning: the free-text stylist was removed in e32e866, and
+  // ranking has always been deterministic. Warning about a key nothing reads
+  // would send somebody hunting for a feature that is not there.
   if (!config.DASHBOARD_TOKEN) {
     warn.push('DASHBOARD_TOKEN unset — the dashboard route refuses every request.');
   }

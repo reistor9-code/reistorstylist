@@ -17,7 +17,8 @@
  */
 
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { handleRequest, runDailyPull, type Env } from './index.js';
+import { handleRequest, runDailyPull } from './index.js';
+import type { Env } from './types.js';
 import { configFromProcess, configWarnings, missingRequired } from './platform/config.js';
 
 /* ------------------------------------------------------------------ *
@@ -197,7 +198,7 @@ export function start(): void {
 
   // A rejection that reaches here is a bug, but killing the bot over it would
   // turn a logging failure into an outage.
-  process.on('unhandledRejection', (reason) => {
+  process.on('unhandledRejection', (reason: unknown) => {
     console.log('[unhandled-rejection]', String(reason));
   });
 }

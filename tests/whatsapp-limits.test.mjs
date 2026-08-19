@@ -11,16 +11,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import {
-  LIMITS,
-  clip,
-  copyViolations,
-  COPY,
-  OCCASIONS,
-  CATEGORIES,
-  formatINR,
-  BANNED_WORDS,
-} from '../dist/index.js';
+// Faizan's e32e866 split the monolith; each symbol now comes from the module
+// that owns it. Importing from the real modules is the point — a test that
+// re-declares the limits proves only that the test agrees with itself.
+import { LIMITS, clip } from '../dist/whatsapp.js';
+import { COPY, copyViolations, formatINR, BANNED_WORDS } from '../dist/copy.js';
+import { OCCASIONS, CATEGORIES } from '../dist/catalog.js';
 
 /* ------------------------------------------------------------------ *
  * Limits

@@ -13,7 +13,9 @@ import assert from 'node:assert/strict';
 
 import { MemoryStore, KvStore, getStore } from '../dist/platform/store.js';
 import { furthestOf, FUNNEL_ORDER, newSessionId } from '../dist/analytics/log.js';
-import { widenCandidates, rankOrder, checkoutUrl } from '../dist/index.js';
+import { widenCandidates } from '../dist/flow.js';
+import { rankOrder } from '../dist/ranking.js';
+import { checkoutUrl } from '../dist/catalog.js';
 import { configFromProcess, missingRequired, configWarnings } from '../dist/platform/config.js';
 
 /* ------------------------------------------------------------------ *
@@ -174,7 +176,7 @@ test('widen: sold-out products are never surfaced', () => {
 });
 
 test('widen: every intro obeys the brand copy rules', async () => {
-  const { copyViolations } = await import('../dist/index.js');
+  const { copyViolations } = await import('../dist/copy.js');
   const all = [product('a', ['casual'], 'dresses')];
 
   for (const [occasion, category] of [['work', 'tops'], ['lounge', 'tops'], ['lounge', 'coords']]) {
