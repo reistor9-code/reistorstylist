@@ -14,11 +14,10 @@ import {
 } from './catalog';
 import { rankLooks } from './ranking';
 import {
-  LIMITS,
   sendButtons,
   sendCarouselTemplate,
+  sendCatalogMessage,
   sendCtaUrl,
-  sendImage,
   sendList,
   sendProductCarousel,
   sendSingleProduct,
@@ -34,7 +33,6 @@ export function freshState(): State {
     shownLookIds: [],
     rankedIds: [],
     reasons: {},
-    browseOffset: 0,
     updatedAt: Date.now(),
   };
 }
@@ -352,70 +350,36 @@ export async function confirmOrder(env: Env, to: string, state: State): Promise<
     { id: 'act:again', title: 'Browse Again' },
     { id: 'act:end', title: 'End Chat' },
   ]);
+
 }
 
-/** Paginates every in-stock product in the current category, 3 at a time. */
-export async function browseCategory(env: Env, to: string, state: State, reset: boolean): Promise<void> {
-  const all = await getProducts(env);
-  // Same reason as widenCandidates(): a category can be empty in stock, and an
-  // empty browse page is a dead end. Widen to the whole shelf and say so.
-  const inCategory = filterProducts(all, undefined, state.category);
-  const widened = inCategory.length === 0;
-  const items = widened ? filterProducts(all) : inCategory;
+/**
+ * The catalogue card, with one way back.
+ *
+ * WhatsApp's catalogue always opens on everything — `catalog_message` takes a
+ * thumbnail id and nothing else, with no collection parameter — so the card
+ * cannot be scoped to the shopper's category. The thumbnail is drawn from
+ * that category instead, which is as close to a scoped card as the API allows.
+ *
+ * Main Menu rides in its own message: the catalogue card carries a fixed
+ * "View catalogue" button and accepts no extras.
+ */
+export async function openCatalogue(
+  env: Env,
+  to: string,
+  state: State,
+  all: Product[],
+): Promise<void> {
+  const cover =
+    filterProducts(all, undefined, state.category)[0]?.id ??
+    state.currentLookId ??
+    state.rankedIds[0] ??
+    filterProducts(all)[0]?.id;
 
-  if (reset) {
-    state.browseOffset = 0;
-    await sendText(
-      env,
-      to,
-      widened
-        ? fill(COPY.browseWidened, { category: categoryLabel(state.category) })
-        : `${categoryLabel(state.category)} — ${COPY.browseIntro}`,
-    );
-  }
+  const sent = cover ? await sendCatalogMessage(env, to, COPY.browseCatalog, cover) : false;
+  if (!sent) console.log('[catalog-message:rejected]', `catalog=${env.CATALOG_ID ?? 'unset'}`);
 
-  const page = items.slice(state.browseOffset, state.browseOffset + 3);
-  for (const product of page) {
-    await sendImage(
-      env,
-      to,
-      product.imageUrl,
-      `${product.title} — ${formatINR(product.priceINR)} — ${cap(product.fabric)}, sizes ${inStockSizes(
-        product,
-      ).join(', ')}`,
-    );
-  }
-  state.browseOffset += page.length;
-  state.step = 'browse';
-
-  const more = state.browseOffset < items.length;
-  const buttons = [
-    ...(more ? [{ id: 'act:load_more', title: 'Load More' }] : []),
-    { id: 'act:pick_item', title: 'Pick an Item' },
-    { id: 'act:back', title: 'Back to Looks' },
-  ];
-  await sendButtons(env, to, more ? COPY.whatNext : COPY.browseEnd, buttons);
+  await sendButtons(env, to, sent ? COPY.whatNext : COPY.catalogUnavailable, [
+    { id: 'act:main_menu', title: 'Main Menu' },
+  ]);
 }
-
-export async function askBrowsePick(env: Env, to: string, state: State): Promise<void> {
-  const all = await getProducts(env);
-  // Mirrors browseCategory(): the pick list has to offer whatever was actually
-  // paged out, widened set included, or it comes back with zero rows.
-  const inCategory = filterProducts(all, undefined, state.category);
-  const shelf = inCategory.length ? inCategory : filterProducts(all);
-  const shown = shelf.slice(0, state.browseOffset);
-  const pool = shown.length ? shown : shelf;
-
-  state.step = 'browse';
-  await sendList(env, to, {
-    header: 'Pick an item to size',
-    body: `${categoryLabel(state.category)}, in stock.`,
-    button: 'Pick item',
-    rows: pool.slice(0, LIMITS.maxRows).map((p) => ({
-      id: `look:${p.id}`,
-      title: p.title,
-      description: `${formatINR(p.priceINR)} · ${cap(p.fabric)}`,
-    })),
-  });
-}
-

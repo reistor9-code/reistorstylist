@@ -53,7 +53,6 @@ export type Step =
   | 'top3'
   | 'size'
   | 'checkout'
-  | 'browse'
   | 'done';
 
 export interface State {
@@ -67,8 +66,6 @@ export interface State {
   /** Ranked candidates: the top 3 first, then the rest of the shelf. */
   rankedIds: string[];
   reasons: Record<string, string>;
-  /** Separate cursor for "Browse Same Category" pagination. */
-  browseOffset: number;
   updatedAt: number;
 }
 

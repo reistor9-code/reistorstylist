@@ -14,24 +14,23 @@
 
 import type { Env, State } from './types';
 import { handleAdmin } from './admin';
-import { CATEGORIES, OCCASIONS, getProducts, isInStock } from './catalog';
+import { CATEGORIES, OCCASIONS, getProducts } from './catalog';
 import { COPY } from './copy';
 import {
-  askBrowsePick,
   askCategory,
   askOccasion,
   askSize,
-  browseCategory,
   clearState,
   confirmOrder,
   freshState,
   loadState,
+  openCatalogue,
   runBackend,
   saveState,
   sendCheckout,
   showMoreLooks,
 } from './flow';
-import { sendButtons, sendCatalogMessage, sendText } from './whatsapp';
+import { sendButtons, sendText } from './whatsapp';
 
 /* ------------------------------------------------------------------ *
  * Router
@@ -101,40 +100,12 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
     case 'act:more':
       await showMoreLooks(env, to, state);
       return;
-    case 'act:catalog': {
-      // The catalogue card, not an in-chat product list. WhatsApp's catalogue
-      // screen always opens on everything — `catalog_message` takes only a
-      // thumbnail id, with no collection parameter — so this cannot be scoped
-      // to the shopper's category.
-      const cover =
-        state.currentLookId ??
-        state.rankedIds[0] ??
-        all.find(isInStock)?.id;
-      const sent = cover
-        ? await sendCatalogMessage(env, to, COPY.browseCatalog, cover)
-        : false;
-      if (!sent) {
-        console.log('[catalog-message:rejected]', `catalog=${env.CATALOG_ID ?? 'unset'}`);
-        await browseCategory(env, to, state, true);
-      }
-      return;
-    }
+    // Both labels lead to the same place: WhatsApp's catalogue cannot be
+    // opened on one category, so "Browse Catalog" and "Browse Category" can
+    // only ever show the same card.
+    case 'act:catalog':
     case 'act:browse':
-      await browseCategory(env, to, state, true);
-      return;
-    case 'act:load_more':
-      await browseCategory(env, to, state, false);
-      return;
-    case 'act:pick_item':
-      await askBrowsePick(env, to, state);
-      return;
-    case 'act:back':
-      if (state.rankedIds.length) {
-        state.step = 'top3';
-        await sendText(env, to, COPY.tapACard);
-      } else {
-        await askOccasion(env, to, state);
-      }
+      await openCatalogue(env, to, state, all);
       return;
     case 'act:paid':
       await confirmOrder(env, to, state);
@@ -224,7 +195,7 @@ async function handleText(env: Env, to: string, state: State, text: string): Pro
 
   /*
    * The carousel carries no menu of its own, so these keywords are the only
-   * way to page or browse by hand. Everything else runs off the buttons.
+   * way to page or open the catalogue by hand. The rest runs off the buttons.
    */
   const keyword = text.trim().toLowerCase();
   if (state.rankedIds.length) {
@@ -232,8 +203,8 @@ async function handleText(env: Env, to: string, state: State, text: string): Pro
       await showMoreLooks(env, to, state);
       return;
     }
-    if (/^browse\b/.test(keyword)) {
-      await browseCategory(env, to, state, true);
+    if (/^(browse|catalog|catalogue)\b/.test(keyword)) {
+      await openCatalogue(env, to, state, await getProducts(env));
       return;
     }
   }
@@ -247,10 +218,6 @@ async function handleText(env: Env, to: string, state: State, text: string): Pro
     case 'size':
       // No menu to re-send — point at the cards instead.
       await sendText(env, to, COPY.tapACard);
-      return;
-    case 'browse':
-      await sendText(env, to, COPY.tapAnOption);
-      await browseCategory(env, to, state, false);
       return;
     default:
       await sendText(env, to, COPY.tapAnOption);
