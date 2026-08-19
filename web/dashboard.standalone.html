@@ -217,6 +217,31 @@ td .sm{display:block;font-size:11px;font-weight:400;opacity:.85;margin-top:2px}
 .qp.YELLOW{background:var(--warn-bg);color:var(--warn)}
 .qp.RED{background:var(--bad-bg);color:var(--bad)}
 
+/* ── callback inbox ──────────────────────────────── */
+/* The only tile that is a work list rather than a report, so it reads as a
+   queue: one row per person, the number large enough to dial from, and a
+   single action. */
+.cb{display:flex;flex-direction:column;gap:10px;margin-top:16px}
+.cbrow{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;
+  background:var(--raise);border-radius:12px;padding:13px 15px}
+.cbrow.late{box-shadow:0 0 0 1.5px var(--bad)}
+.cbwho{min-width:0}
+.cbnum{font-size:16px;font-weight:700;letter-spacing:.01em;
+  font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+.cbmeta{font-size:12.5px;color:var(--mute);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cbwait{font-size:12px;color:var(--dim);margin-top:2px}
+.cbwait.late{color:var(--bad);font-weight:700}
+.cbact{display:flex;flex-direction:column;gap:6px;align-items:flex-end}
+.cbcall{background:var(--text);color:var(--bg);border-radius:9px;padding:8px 14px;
+  font:700 13px Outfit,sans-serif;text-decoration:none;white-space:nowrap}
+.cbdone{background:none;border:1px solid var(--line);color:var(--mute);border-radius:9px;
+  padding:7px 12px;font:400 12.5px Outfit,sans-serif;cursor:pointer;white-space:nowrap}
+.cbdone:hover{color:var(--text)}
+.cbdone[disabled]{opacity:.5;cursor:default}
+.cbflag{font-size:11.5px;border-radius:14px;padding:3px 9px;font-weight:700;
+  background:var(--warn-bg);color:var(--warn);display:inline-block;margin-top:5px}
+
 /* ── loading and failure ─────────────────────────── */
 /* The skeleton mirrors the real layout so the page does not jump when data
    lands — the funnel card and the stat stack keep their footprint. */
@@ -314,6 +339,7 @@ const ICON = {
   stop:'<circle cx="9" cy="9" r="6"/><path d="M7 7l4 4M11 7l-4 4"/>',
 };
 const NAV = [
+  ['stop','Call these people','#callbacks'],
   ['funnel','Funnel','#funnel'], ['sales','Sales','#sales'],
   ['health','Account health','#health'], ['stock','Restock list','#kan'],
   ['reach','Campaigns','#kan'], ['grid','Demand vs catalog','#demand'],
@@ -431,10 +457,20 @@ document.getElementById('sidefoot').innerHTML =
   (DATA.range.phoneNumberId ? `<br>Number …${esc(String(DATA.range.phoneNumberId).slice(-6))}` : '') +
   (LIVE ? '' : '<br><b>Sample data</b> — not connected');
 
-/* ── the two alarm states, and only these two ────── */
+const CB = DATA.callbacks || [];
+const cbLate = CB.filter((c) => c.overdue).length;
+
+/* ── the alarm states ────────────────────────────── */
 const broken = (DATA.health.templates || []).filter(t =>
   t.status === 'PAUSED' || t.status === 'DISABLED' || t.quality === 'RED');
 const bleeding = (DATA.funnel || []).filter(f => f.lostPct >= 50);
+
+const lateHTML = cbLate ? `<div class="alert">
+  <span class="ai">!</span>
+  <div><h4>${cbLate === 1 ? 'Someone has been waiting over 24 hours' : cbLate + ' people have been waiting over 24 hours'}</h4>
+    <p>The bot promised a call within 24 hours. That promise is already past due —
+      the numbers are in the list below.</p></div>
+</div>` : '';
 
 const alertHTML = broken.length ? `<div class="alert">
   <span class="ai">!</span>
@@ -443,6 +479,51 @@ const alertHTML = broken.length ? `<div class="alert">
       t.quality ? ' · quality ' + esc(t.quality) : ''}`).join(' &nbsp;·&nbsp; ')}.
       The entry flow is broken right now and someone has to act today.</p></div>
 </div>` : '';
+
+/* ── callback inbox ──────────────────────────────── */
+/* Placed above the funnel because it is the only tile somebody has to ACT on.
+   Everything else on this page is a number to read. */
+
+/* Rendered as a phone number with a tel: link, because the whole point is that
+   someone rings it. Formatted for reading, dialled unformatted. */
+const dialable = (waId) => '+' + String(waId).replace(/\D/g, '');
+const prettyNumber = (waId) => {
+  const d = String(waId).replace(/\D/g, '');
+  // Indian numbers arrive as 91XXXXXXXXXX.
+  return d.length === 12 && d.startsWith('91')
+    ? `+91 ${d.slice(2, 7)} ${d.slice(7)}`
+    : '+' + d;
+};
+
+const callbackHTML = `<section class="card c8" id="callbacks">
+  <div class="ch"><h3>Call these people</h3>
+    <span class="pill">${CB.length} waiting${cbLate ? ` · ${cbLate} overdue` : ''}</span></div>
+  ${CB.length ? `<div class="cb">
+    ${CB.map((c) => `<div class="cbrow${c.overdue ? ' late' : ''}">
+      <div class="cbwho">
+        <div class="cbnum">${esc(prettyNumber(c.waId))}</div>
+        <div class="cbmeta">${esc(c.profileName || 'No profile name')}${
+          c.occasion || c.category
+            ? ` · was browsing ${esc([c.occasion, c.category].filter(Boolean).join(' · '))}`
+            : ''
+        }${c.productsSeen.length ? ` · saw ${c.productsSeen.length} looks` : ''}</div>
+        <div class="cbwait${c.overdue ? ' late' : ''}">asked ${when(c.requestedAt)} · waiting ${
+          c.hoursWaiting < 1 ? 'under an hour' : Math.round(c.hoursWaiting) + 'h'
+        }${c.overdue ? ' — past the 24h promise' : ''}</div>
+        ${c.marketingOptOut
+          ? '<span class="cbflag">opted out of marketing — call about this request only</span>'
+          : ''}
+      </div>
+      <div class="cbact">
+        <a class="cbcall" href="tel:${esc(dialable(c.waId))}">Call</a>
+        <button class="cbdone" type="button" data-cb="${c.id}">Mark called</button>
+      </div>
+    </div>`).join('')}
+  </div>` : `<div class="empty" style="margin-top:16px">Nobody is waiting for a call. This fills
+    the moment somebody taps “Talk to Stylist”.</div>`}
+  <div class="note">The bot promises a call within 24 hours. These numbers came from shoppers who
+    messaged first and asked to be rung — use them for that, and nothing else.</div>
+</section>`;
 
 /* ── funnel ──────────────────────────────────────── */
 /* Not `top` — that is already `window.top` on a page, and redeclaring it with
@@ -687,8 +768,10 @@ document.getElementById('main').innerHTML = `
     <span class="chip">Orders <b>${n(R.orders)}</b></span>
     ${controlsHTML}
   </div>
+  ${lateHTML}
   ${alertHTML}
   <div class="grid">
+    ${callbackHTML}
     ${funnelHTML}
     ${salesHTML}
     ${healthHTML}
@@ -705,13 +788,34 @@ document.getElementById('phone').onchange = e => { STATE.phone = e.target.value;
 document.getElementById('theme').onclick = toggleTheme;
 document.getElementById('refresh').onclick = e => { e.target.disabled = true; load(); };
 
+/* Mark called. Optimistic only as far as disabling the button — the row is
+   removed by the reload, so the list can never disagree with the database. */
+document.querySelectorAll('.cbdone').forEach((btn) => {
+  btn.onclick = async () => {
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+    try {
+      const res = await fetch(`${CFG.apiBase}/callback?token=${encodeURIComponent(CFG.token)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: Number(btn.dataset.cb), agent: 'dashboard' }),
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      load();
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = 'Failed — retry';
+    }
+  };
+});
+
 /* Rail follows the section you're reading.
    Track a set and pick the earliest section in document order, rather than
    letting the last callback win — the funnel and the sales stack sit side by
    side, so at the top of the page both intersect and whichever fired last was
    highlighting "Sales" while the reader was plainly looking at the funnel. */
 const links = [...document.querySelectorAll('#nav a')];
-const ORDER = ['funnel', 'sales', 'health', 'kan', 'demand', 'stopped'];
+const ORDER = ['callbacks', 'funnel', 'sales', 'health', 'kan', 'demand', 'stopped'];
 const live = new Set();
 const obs = new IntersectionObserver(es => {
   es.forEach(e => e.isIntersecting ? live.add(e.target.id) : live.delete(e.target.id));

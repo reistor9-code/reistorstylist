@@ -4,6 +4,7 @@
  *   GET /dashboard?token=…            the dashboard (fetches the API on load)
  *   GET /dashboard/api?token=…        the data as JSON
  *   GET /dashboard/plain?token=…      the same numbers with no JavaScript
+ *   POST /dashboard/api/callback      mark a callback handled — the ONLY write
  *
  * Rendered on the server on purpose. The alternative — a browser page holding
  * a Supabase key and querying directly — would put a credential that can read
@@ -18,7 +19,7 @@
  */
 
 import { type SupabaseConfig } from '../platform/supabase.js';
-import { defaultRange, loadDashboard, type DashboardData } from './queries.js';
+import { defaultRange, loadDashboard, markCalled, type DashboardData } from './queries.js';
 import { renderShell } from './page.js';
 
 export interface DashboardEnv {
@@ -41,7 +42,13 @@ export async function handleDashboard(
   env: DashboardEnv,
   path: string,
 ): Promise<Response> {
-  if (request.method !== 'GET') {
+  /*
+   * POST is allowed on exactly one path: marking a callback handled. Every
+   * other route is a read, and keeping the write surface to a single endpoint
+   * is what makes that easy to reason about.
+   */
+  const isCallbackWrite = path === '/dashboard/api/callback' && request.method === 'POST';
+  if (request.method !== 'GET' && !isCallbackWrite) {
     return new Response('Method not allowed', { status: 405 });
   }
 
@@ -103,6 +110,39 @@ export async function handleDashboard(
   }
 
   const cfg: SupabaseConfig = { url: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_KEY };
+
+  /*
+   * Mark a callback handled.
+   *
+   * Guarded by the same token as the rest of the dashboard. The filter in
+   * markCalled() includes `status=eq.pending`, so a double submit updates
+   * nothing rather than overwriting who called and when.
+   */
+  if (isCallbackWrite) {
+    let body: { id?: number; agent?: string; notes?: string };
+    try {
+      body = (await request.json()) as typeof body;
+    } catch {
+      return new Response(JSON.stringify({ ok: false, error: 'bad json' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    const id = Number(body?.id);
+    if (!Number.isInteger(id) || id <= 0) {
+      return new Response(JSON.stringify({ ok: false, error: 'id required' }), {
+        status: 400,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    const ok = await markCalled(cfg, id, String(body?.agent ?? 'dashboard'), body?.notes);
+    return new Response(JSON.stringify({ ok }), {
+      status: ok ? 200 : 500,
+      headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+    });
+  }
   /*
    * Defaults to the number this instance is configured with, so the figures
    * shown match the bot that is running. `phone=all` opts into everything,

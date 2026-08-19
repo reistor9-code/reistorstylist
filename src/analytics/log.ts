@@ -132,6 +132,19 @@ export class Analytics {
   async openSession(_sessionId: string, _waId: string): Promise<void> {}
   async patchSession(_sessionId: string, _patch: SessionPatch): Promise<void> {}
   async rememberProducts(_products: ProductName[]): Promise<void> {}
+  async callbackRequest(_r: CallbackRequest): Promise<boolean> {
+    return false;
+  }
+}
+
+/** A shopper asking to be phoned, with the context whoever calls will want. */
+export interface CallbackRequest {
+  waId: string;
+  sessionId?: string;
+  profileName?: string;
+  occasion?: string;
+  category?: string;
+  productsSeen?: string[];
 }
 
 /** Just enough of a product to name it on the dashboard. */
@@ -371,6 +384,62 @@ class SupabaseAnalytics extends Analytics {
         ),
       'rememberProducts',
     );
+  }
+
+  /**
+   * Records a request to be called back.
+   *
+   * Returns whether it was stored, because the caller has to know: the bot
+   * tells the shopper "a stylist will call you within 24 hours", and promising
+   * that when nothing was written is worse than not offering the button. A
+   * false here means say something honest instead.
+   *
+   * `insertIgnore` on the partial unique index means a shopper tapping the
+   * button three times leaves one open row, not three — otherwise the same
+   * person gets rung three times, which reads as harassment rather than
+   * service.
+   */
+  override async callbackRequest(r: CallbackRequest): Promise<boolean> {
+    try {
+      const res = await insertIgnore(
+        this.cfg,
+        'callback_requests',
+        this.row({
+          wa_id: r.waId,
+          session_id: r.sessionId ?? null,
+          profile_name: r.profileName ?? null,
+          occasion: r.occasion ?? null,
+          category: r.category ?? null,
+          products_seen: r.productsSeen ?? [],
+          requested_at: new Date().toISOString(),
+          // The free-form WhatsApp window. A phone call is unaffected by it;
+          // a WhatsApp reply after it closes needs an approved template.
+          window_expires_at: new Date(Date.now() + 24 * 3600 * 1000).toISOString(),
+          status: 'pending',
+        }),
+        'wa_id',
+      );
+
+      // Also an event, so the funnel can count how many people asked for a
+      // human without joining across to the queue.
+      await insert(
+        this.cfg,
+        'events',
+        this.row({
+          wa_id: r.waId,
+          session_id: r.sessionId ?? null,
+          direction: 'system',
+          event_type: 'callback_requested',
+          flow_step: 'top3',
+          meta: { occasion: r.occasion, category: r.category },
+        }),
+      );
+
+      return res.ok;
+    } catch (err) {
+      console.log('[analytics:callbackRequest]', String(err));
+      return false;
+    }
   }
 
   override async openSession(sessionId: string, waId: string): Promise<void> {

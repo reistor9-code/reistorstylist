@@ -11,7 +11,7 @@
  * more useful than a dashboard that renders a stack trace.
  */
 
-import { type SupabaseConfig, select } from '../platform/supabase.js';
+import { type SupabaseConfig, select, update } from '../platform/supabase.js';
 
 export interface Range {
   /** Inclusive ISO date, e.g. 2026-08-01. */
@@ -80,6 +80,86 @@ export async function funnel(cfg: SupabaseConfig, range: Range): Promise<FunnelS
       lostPct: previous > 0 ? Math.round(((previous - s.value) / previous) * 1000) / 10 : 0,
     };
   });
+}
+
+/* ------------------------------------------------------------------ *
+ * Callbacks — the only tile that is a to-do list
+ * ------------------------------------------------------------------ */
+
+export interface Callback {
+  id: number;
+  /** The number to ring. Meta delivers it unmasked; the shopper messaged first. */
+  waId: string;
+  profileName: string | null;
+  occasion: string | null;
+  category: string | null;
+  productsSeen: string[];
+  requestedAt: string;
+  hoursWaiting: number;
+  /** Past 24h the promise is already broken. */
+  overdue: boolean;
+  /** False once the free-form WhatsApp window shuts. A phone call is unaffected. */
+  windowOpen: boolean;
+  /**
+   * True when this person has opted out of marketing. They may still be called
+   * about the request they made — that is service — but they must never be
+   * added to a promotional send.
+   */
+  marketingOptOut: boolean;
+  status: string;
+  calledAt: string | null;
+  calledBy: string | null;
+}
+
+/**
+ * The callback queue, oldest first.
+ *
+ * Oldest first rather than newest: this is a work list, and the person who has
+ * been waiting longest is the one at risk of being let down.
+ */
+export async function callbacks(
+  cfg: SupabaseConfig,
+  range: Range,
+  limit = 50,
+): Promise<Callback[]> {
+  const res = await select<Record<string, unknown>[]>(
+    cfg,
+    'v_callbacks',
+    `status=eq.pending${phoneFilter(range)}&select=*&order=requested_at.asc&limit=${limit}`,
+  );
+
+  return (res.data ?? []).map((r) => ({
+    id: num(r.id),
+    waId: String(r.wa_id ?? ''),
+    profileName: (r.profile_name as string) ?? null,
+    occasion: (r.occasion as string) ?? null,
+    category: (r.category as string) ?? null,
+    productsSeen: Array.isArray(r.products_seen) ? (r.products_seen as string[]) : [],
+    requestedAt: String(r.requested_at ?? ''),
+    hoursWaiting: num(r.hours_waiting),
+    overdue: num(r.hours_waiting) >= 24,
+    windowOpen: r.window_open === true,
+    marketingOptOut: r.marketing_opt_out === true,
+    status: String(r.status ?? 'pending'),
+    calledAt: (r.called_at as string) ?? null,
+    calledBy: (r.called_by as string) ?? null,
+  }));
+}
+
+/** Marks one request handled. The only write the dashboard performs. */
+export async function markCalled(
+  cfg: SupabaseConfig,
+  id: number,
+  agent: string,
+  notes?: string,
+): Promise<boolean> {
+  const res = await update(cfg, 'callback_requests', `id=eq.${id}&status=eq.pending`, {
+    status: 'called',
+    called_at: new Date().toISOString(),
+    called_by: agent.slice(0, 80),
+    ...(notes ? { notes: notes.slice(0, 500) } : {}),
+  });
+  return res.ok;
 }
 
 /* ------------------------------------------------------------------ *
@@ -441,6 +521,8 @@ export async function revenue(
 export interface DashboardData {
   range: Range;
   generatedAt: string;
+  /** Pending callback requests — a work list, not a report. */
+  callbacks: Callback[];
   funnel: FunnelStep[];
   topProducts: TopProduct[];
   productConversion: ProductConversion[];
@@ -462,6 +544,7 @@ export interface DashboardData {
  */
 export async function loadDashboard(cfg: SupabaseConfig, range: Range): Promise<DashboardData> {
   const [
+    callbackRows,
     funnelRows,
     top,
     conversion,
@@ -473,6 +556,7 @@ export async function loadDashboard(cfg: SupabaseConfig, range: Range): Promise<
     attritionStats,
     healthRow,
   ] = await Promise.all([
+    callbacks(cfg, range),
     funnel(cfg, range),
     topProducts(cfg),
     productConversion(cfg),
@@ -492,6 +576,7 @@ export async function loadDashboard(cfg: SupabaseConfig, range: Range): Promise<
   return {
     range,
     generatedAt: new Date().toISOString(),
+    callbacks: callbackRows,
     funnel: funnelRows,
     topProducts: top,
     productConversion: conversion,

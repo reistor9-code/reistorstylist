@@ -33,6 +33,20 @@ const TABLES = {
       used_stylist: 52, widened_brief: 26,
     },
   ],
+  // One overdue, one fresh, one opted out of marketing — so the alarm, the
+  // waiting counter and the compliance flag are all exercised.
+  v_callbacks: [
+    { id: 1, wa_id: '919876543210', phone_number_id: PHONE, profile_name: 'Aditi',
+      occasion: 'work', category: 'tops', products_seen: ['7382019', '7382044'],
+      requested_at: '2026-08-18T04:00:00Z', window_expires_at: '2026-08-19T04:00:00Z',
+      window_open: false, status: 'pending', called_at: null, called_by: null, notes: null,
+      marketing_opt_out: false, hours_waiting: 31.5 },
+    { id: 2, wa_id: '919812345678', phone_number_id: PHONE, profile_name: null,
+      occasion: 'dinner', category: 'dresses', products_seen: ['7382088'],
+      requested_at: '2026-08-19T09:00:00Z', window_expires_at: '2026-08-20T09:00:00Z',
+      window_open: true, status: 'pending', called_at: null, called_by: null, notes: null,
+      marketing_opt_out: true, hours_waiting: 2.1 },
+  ],
   v_top_products: [
     { product_id: '7382019', title: 'Hemp Poplin Shirt',  units_sold: 12, revenue_inr: 35988, orders: 11, last_sold_at: '2026-08-17T14:22:10Z' },
     { product_id: '7382044', title: 'Linen Notch Blouse', units_sold: 9,  revenue_inr: 28791, orders: 9,  last_sold_at: '2026-08-18T06:40:00Z' },

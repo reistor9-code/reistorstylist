@@ -227,6 +227,92 @@ CREATE INDEX IF NOT EXISTS order_items_product_idx ON order_items (product_id);
 -- daily. Without this the dashboard cannot show a month of campaign
 -- performance no matter how the query is written.
 /* ------------------------------------------------------------------ *
+ * 5a. Callback requests — the one tile that is a to-do list
+ *
+ * A shopper taps "Talk to Stylist" and the bot promises a call within 24
+ * hours. Meta delivers that tap as an ordinary button webhook and does nothing
+ * else with it: no email, no queue, no inbox. Before this table the request
+ * was written to the console and lost, so the promise could not be kept.
+ *
+ * COMPLIANCE, because this is the one table holding a phone number a human
+ * will act on:
+ *
+ *   - The number is here because the shopper messaged first and asked to be
+ *     called. That is service, and it is the purpose the number may be used
+ *     for — nothing else.
+ *   - `marketing_consent` is deliberately absent. Asking for a callback is NOT
+ *     opting into marketing. Anyone exporting this list for a promo blast is
+ *     violating Meta's policy and risks the number's quality rating; the view
+ *     below carries `marketing_opt_out` so the dashboard can say so out loud.
+ *   - A phone call sits outside WhatsApp entirely, so it is unaffected by the
+ *     24-hour service window. `window_expires_at` is recorded anyway, because
+ *     replying *on WhatsApp* after it closes needs an approved template.
+ * ------------------------------------------------------------------ */
+
+CREATE TABLE IF NOT EXISTS callback_requests (
+  id              BIGSERIAL PRIMARY KEY,
+  wa_id           TEXT NOT NULL,
+  session_id      UUID,
+  phone_number_id TEXT,
+  profile_name    TEXT,
+
+  -- What they were looking at when they asked, so whoever calls has context
+  -- rather than opening with "how can I help".
+  occasion        TEXT,
+  category        TEXT,
+  products_seen   TEXT[] NOT NULL DEFAULT '{}',
+
+  requested_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  /* When the free-form WhatsApp window shuts. A call is unaffected; a WhatsApp
+     reply after this needs an approved template. */
+  window_expires_at TIMESTAMPTZ NOT NULL DEFAULT (now() + interval '24 hours'),
+
+  status          TEXT NOT NULL DEFAULT 'pending',  -- pending | called | closed
+  called_at       TIMESTAMPTZ,
+  called_by       TEXT,
+  notes           TEXT
+);
+
+/*
+ * One open request per shopper. Tapping the button three times is impatience,
+ * not three customers — and a list that shows them three times gets one of
+ * them called three times.
+ */
+CREATE UNIQUE INDEX IF NOT EXISTS callback_one_open_per_shopper
+  ON callback_requests (wa_id) WHERE status = 'pending';
+
+CREATE INDEX IF NOT EXISTS callback_pending_idx
+  ON callback_requests (requested_at DESC) WHERE status = 'pending';
+
+/**
+ * The callback queue, oldest first, with the compliance flags attached.
+ *
+ * `marketing_opt_out` rides along so the dashboard can mark a row: that person
+ * may be called about their request, and must not be sent marketing.
+ */
+CREATE OR REPLACE VIEW v_callbacks AS
+SELECT
+  c.id,
+  c.wa_id,
+  c.phone_number_id,
+  COALESCE(c.profile_name, s.profile_name)      AS profile_name,
+  c.occasion,
+  c.category,
+  c.products_seen,
+  c.requested_at,
+  c.window_expires_at,
+  (c.window_expires_at > now())                 AS window_open,
+  c.status,
+  c.called_at,
+  c.called_by,
+  c.notes,
+  COALESCE(s.marketing_opt_out, false)          AS marketing_opt_out,
+  -- Hours waiting. The promise is 24; anything past that is already late.
+  ROUND(EXTRACT(EPOCH FROM (now() - c.requested_at)) / 3600.0, 1) AS hours_waiting
+FROM callback_requests c
+LEFT JOIN shoppers s ON s.wa_id = c.wa_id;
+
+/* ------------------------------------------------------------------ *
  * 6a. Product names
  * ------------------------------------------------------------------ */
 
@@ -445,6 +531,7 @@ ALTER TABLE sessions        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE events          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items     ENABLE ROW LEVEL SECURITY;
+ALTER TABLE callback_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_names   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE template_stats  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE account_health  ENABLE ROW LEVEL SECURITY;

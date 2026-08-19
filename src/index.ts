@@ -170,23 +170,36 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
       return;
     case 'act:callback': {
       /*
-       * Nothing here records the request: the log line below is its only
-       * trace, and `wrangler tail` shows it solely while someone is watching.
-       * The shopper's wa_id is the number to ring.
+       * Written to the callback queue, which the dashboard shows as a to-do
+       * list. It used to be a console line only — visible in `wrangler tail`
+       * while somebody watched, and gone otherwise — so the "we will call you
+       * within 24 hours" promise had nothing behind it.
+       *
+       * The shopper's wa_id IS the number to ring: Meta delivers it unmasked
+       * because they messaged the business first.
        */
-      console.log(
-        '[stylist:callback]',
-        JSON.stringify({
-          waId: to,
-          occasion: state.occasion ?? null,
-          category: state.category ?? null,
-          looksShown: state.shownLookIds,
-          at: new Date().toISOString(),
-        }),
+      const stored = await getAnalytics(env).callbackRequest({
+        waId: to,
+        sessionId: state.sessionId,
+        occasion: state.occasion,
+        category: state.category,
+        productsSeen: state.shownLookIds,
+      });
+
+      console.log('[stylist:callback]', to, stored ? 'queued' : 'NOT STORED');
+
+      /*
+       * The promise is only made when it can be kept. With analytics
+       * unconfigured nothing was written, and telling somebody a stylist will
+       * ring them when no one will ever see the request is worse than saying
+       * nothing — so the fallback asks them to write instead.
+       */
+      await sendButtons(
+        env,
+        to,
+        stored ? COPY.stylistCallback : COPY.stylistCallbackUnavailable,
+        [{ id: 'act:main_menu', title: 'Main Menu' }],
       );
-      await sendButtons(env, to, COPY.stylistCallback, [
-        { id: 'act:main_menu', title: 'Main Menu' },
-      ]);
       return;
     }
     case 'act:main_menu': {

@@ -94,6 +94,13 @@ export const COPY = {
   afterCheckout: 'Tap below once you are back from checkout.',
   orderConfirmed: 'Order Confirmed! Thank you for shopping with Reistor.',
   stylistCallback: 'A stylist from our team will call you on this number within 24 hours.',
+  /*
+   * Only sent when the request could not be stored. Promising a call that
+   * nobody will ever see is worse than admitting the queue is down, so this
+   * says what the shopper can do instead of making a commitment.
+   */
+  stylistCallbackUnavailable:
+    'Reply here with what you are after and a stylist will pick it up from this chat.',
   goodbye: 'Thanks for shopping with Reistor. Message anytime for a new look ✨',
   tapAnOption: 'Tap an option below to keep going.',
   // Meta rejects a product message without a body — "(#131009) The parameter
