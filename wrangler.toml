@@ -10,20 +10,28 @@ compatibility_flags = ["nodejs_compat"]
 # then paste the returned ids below.
 [[kv_namespaces]]
 binding = "STATE"
-id = "f518f0dfecbc4167a8afc28e1db9d686"
-preview_id = "f559fb3aeae4452083289411f165bf87"
+id = "48fa62c587d2470e8cb2082ac48c3f09"
+preview_id = "02b33756589944c3baed19de848a9124"
 
 [vars]
 # Graph API version used for every outbound WhatsApp call. Interactive product
 # carousels are a newer message type — v21.0 rejects them.
 GRAPH_API_VERSION = "v25.0"
-# Anthropic model for ranking + the free-text stylist.
-ANTHROPIC_MODEL = "claude-sonnet-5"
 
 # Commerce catalog connected to the WABA. Recommended looks render as a
 # product carousel whose cards open WhatsApp's own PDP. Unset it and the looks
 # fall back to plain image messages.
 CATALOG_ID = "1572339217700903"
+
+# Shopify CDN transform applied to every catalog image. Product shots are
+# 2:3 portrait, so a square centre-crop loses heads and feet — `crop=top`
+# keeps the face. Re-run /admin/catalog after changing this.
+CATALOG_IMAGE_TRANSFORM = "width=1080&height=1080&crop=top"
+
+# Shopify product metafield holding bespoke artwork for the PDP abandonment
+# card. `file_reference` type, so its raw value is a MediaImage gid —
+# /admin/metafields resolves that to a CDN url.
+PDP_IMAGE_METAFIELD = "custom.kwikengage_product_image"
 
 # Occasion / category pickers are approved carousel Marketing templates,
 # billed at ~₹0.86 per delivered message (Meta's test number does not bill).
@@ -42,4 +50,3 @@ IND_SHOPIFY_API_VERSION = "2026-04"
 #   WHATSAPP_TOKEN     Meta system-user / temporary access token
 #   PHONE_NUMBER_ID    WhatsApp Business phone number id
 #   VERIFY_TOKEN       any string; must match what you paste into Meta
-#   ANTHROPIC_API_KEY  Anthropic API key (optional — see README fallback note)

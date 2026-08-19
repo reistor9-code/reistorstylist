@@ -228,6 +228,56 @@ with the caption and link rather than dropping the look.
 `productUrl` is a `reistor.in` product page; `checkoutUrl()` appends `?variant=<size>` plus UTM
 params for the GoKwik deep link. Point it at your real checkout URL shape there.
 
+## Custom product images (metafields)
+
+A partner integration — the **PDP abandonment card** — can show bespoke artwork per product rather
+than the catalogue shot. The artwork is set in Shopify against a product metafield:
+
+| | |
+| --- | --- |
+| Namespace / key | `custom.kwikengage_product_image` (`PDP_IMAGE_METAFIELD` in `wrangler.toml`) |
+| Type | `file_reference` (single image) |
+| Set in admin | Product → Metafields → *kwikengage product image* |
+| Storefront access | `PUBLIC_READ`, so a Storefront API token can read it too |
+
+A `file_reference` stores a **`gid://shopify/MediaImage/…`, not a URL** — the raw REST read at
+`/admin/api/<version>/products/<id>/metafields.json` returns only that gid, which a partner
+integration cannot render. So the image is also mirrored as a plain link:
+
+| | |
+| --- | --- |
+| Namespace / key | `custom.kwikengage_product_image_url` — the `_url` suffix is derived from `PDP_IMAGE_METAFIELD`, not configured separately |
+| Type | `url` |
+| Value | the same image's CDN link, e.g. `https://cdn.shopify.com/s/files/…png?v=…` |
+
+**Both have to be filled per product.** Set the image on the `file_reference` field, then paste its
+CDN link into the `_url` field — a partner reading over REST gets something usable, and the
+reference field stays the one a merchant picks in admin.
+
+Resolving the gid side needs GraphQL, which is what this route does:
+
+```
+/admin/metafields?token=<VERIFY_TOKEN>&id=<PRODUCT_ID>
+```
+
+| Param | Required | Notes |
+| --- | --- | --- |
+| `token` | yes | `VERIFY_TOKEN`, same gate as every other `/admin` route |
+| `id` | one of | Numeric product id (`9474639724821`) or a full `gid://` |
+| `handle` | one of | Product handle, if the id isn't to hand |
+| `namespace` | no | `custom` (default) or `all` for every namespace |
+| `key` | no | Single metafield, e.g. `kwikengage_product_image` |
+| `full` | no | `1` stops long values being truncated at 400 chars |
+
+The response lifts the resolved image out as `customImage.imageUrl` and lists the rest under
+`metafields[]`, each `file_reference` carrying its own `imageUrl`, `width` and `height`. The mirror
+is reported alongside as `customImage.url` / `urlFound`.
+
+The Shopify app needs **`read_files`** alongside `read_products` — without it Shopify answers the
+reference field with an access error, which the route surfaces under `errors` (the gid still comes
+back in `value`). `customImage.imageUrl` falls back to the `_url` mirror in that case, so the
+response stays usable either way.
+
 ## Claude
 
 | Step | Call |
