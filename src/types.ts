@@ -12,6 +12,21 @@ export interface Env {
   WHATSAPP_TOKEN: string;
   PHONE_NUMBER_ID: string;
   VERIFY_TOKEN: string;
+  /* Razorpay — test-mode payment links. See src/razorpay.ts. */
+  RAZORPAY_KEY_ID?: string;
+  RAZORPAY_KEY_SECRET?: string;
+  RAZORPAY_WEBHOOK_SECRET?: string;
+  /* Reserved for the GoKwik path in src/payments.ts, which is not wired up. */
+  GOKWIK_WEBHOOK_SECRET?: string;
+  /* Dashboard — see src/dashboard/. Supabase holds the analytics tables. */
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_KEY?: string;
+  DASHBOARD_TOKEN?: string;
+  /* Conversions API — credits a purchase back to the ad that caused it. */
+  /** Needed by the nightly pull for template performance. */
+  WABA_ID?: string;
+  META_DATASET_ID?: string;
+  META_CAPI_TOKEN?: string;
   GRAPH_API_VERSION?: string;
   /** Meta Commerce catalog connected to the WABA. Set it and the recommended
    *  looks render as a product carousel with a real WhatsApp PDP behind each
@@ -55,7 +70,23 @@ export type Step =
   | 'checkout'
   | 'done';
 
+/**
+ * One garment from a sent cart.
+ *
+ * A cart arrives with no sizes — WhatsApp's catalogue holds one entry per
+ * product, not per variant — so each line is sized in turn before anything is
+ * charged, and the whole basket is then bought once.
+ */
+export interface CartLine {
+  productId: string;
+  title: string;
+  priceINR: number;
+  size?: string;
+}
+
 export interface State {
+  /** Groups every event in one journey. New on each restart of the flow. */
+  sessionId?: string;
   step: Step;
   occasion?: string;
   category?: string;

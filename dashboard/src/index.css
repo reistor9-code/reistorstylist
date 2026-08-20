@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens ported from Gentelella v4 (ColorlibHQ, MIT).
+ *
+ * Kept as the same custom-property names the template uses, so its values can
+ * be updated from upstream by replacing this block rather than hunting through
+ * components. Everything below the tokens is our own markup.
+ *
+ * The signature of this template is the dark navy rail against a light page —
+ * so the sidebar keeps its own colour set and does NOT flip with the theme.
+ */
+@layer base {
+  :root {
+    /* The rail. Fixed dark in both themes, as upstream. */
+    --sidebar-bg: #1a2332;
+    --sidebar-hover: rgba(255, 255, 255, 0.04);
+    --sidebar-active: rgba(26, 187, 156, 0.08);
+    --sidebar-text: #7b8fa3;
+    --sidebar-text-hover: #c5d0dc;
+    --sidebar-text-active: #ffffff;
+    --sidebar-border: rgba(255, 255, 255, 0.06);
+
+    --primary: #1abb9c;
+    --primary-lt: rgba(26, 187, 156, 0.06);
+    --primary-dk: #169f85;
+
+    --body-bg: #f5f7fb;
+    --bg-surface: #ffffff;
+    --bg-surface-secondary: #f9fafb;
+
+    --border-color: #e6e7eb;
+    --border-translucent: rgba(4, 32, 69, 0.08);
+
+    --text: #1e2633;
+    --text-secondary: #626d7d;
+    --text-muted: #7e8896;
+
+    --green: #2fb344;
+    --yellow: #f59f00;
+    --red: #d63939;
+    --blue: #066fd1;
+    --green-lt: rgba(47, 179, 68, 0.06);
+    --yellow-lt: rgba(245, 159, 0, 0.06);
+    --red-lt: rgba(214, 57, 57, 0.06);
+    --blue-lt: rgba(6, 111, 209, 0.06);
+
+    --radius: 6px;
+    --shadow-card: 0 0 0 1px var(--border-translucent), rgba(30, 38, 51, 0.04) 0 2px 4px 0;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+
+  [data-theme='dark'] {
+    --body-bg: #0f1623;
+    --bg-surface: #1a2332;
+    --bg-surface-secondary: #141d2b;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --border-translucent: rgba(255, 255, 255, 0.08);
+    --text: #e6ebf2;
+    --text-secondary: #b3bccb;
+    --text-muted: #8a93a3;
+    --primary-lt: rgba(26, 187, 156, 0.14);
+    --green-lt: rgba(47, 179, 68, 0.16);
+    --yellow-lt: rgba(245, 159, 0, 0.16);
+    --red-lt: rgba(214, 57, 57, 0.16);
+    --blue-lt: rgba(6, 111, 209, 0.18);
+    --shadow-card: 0 0 0 1px var(--border-translucent), rgba(0, 0, 0, 0.3) 0 2px 4px 0;
+  }
+
+  body {
+    @apply bg-body text-text;
+    font-family: var(--font);
+    font-size: 0.875rem;
+    line-height: 1.4286;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Digits in a column have to line up or the eye cannot compare them. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  /* Gentelella's panel: a surface with a hairline ring rather than a border. */
+  .x-panel {
+    background: var(--bg-surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+  }
+
+  /* Its title bar — heading left, actions right, hairline underneath. */
+  .x-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.875rem 1.25rem;
+    border-bottom: 1px solid var(--border-color);
+  }
+
+  .x-title h3 {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+}

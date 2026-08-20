@@ -12,11 +12,14 @@
  * admin.ts.
  */
 
-import type { Env, State } from './types';
+import type { CartLine, Env, State } from './types';
+import { clearCart, loadCart, saveCart } from './cart';
 import { handleAdmin } from './admin';
+import type { Product } from './catalog';
 import { CATEGORIES, OCCASIONS, getProducts } from './catalog';
 import { COPY } from './copy';
 import {
+  askCartPick,
   askCategory,
   askOccasion,
   askSize,
@@ -27,9 +30,22 @@ import {
   openCatalogue,
   runBackend,
   saveState,
-  sendCheckout,
   showMoreLooks,
 } from './flow';
+import {
+  markCartSent,
+  readEntrySource,
+  recordEntrySource,
+  recordCallbackRequest,
+  recordSearchMiss,
+  stripSourceCode,
+  type Referral,
+} from './analytics/capture';
+import { getAnalytics } from './analytics/log';
+import { analyticsProbe } from './analytics/probe';
+import { handleDashboard } from './dashboard/route';
+import { runJobs } from './jobs';
+import { handleRazorpayWebhook, razorpayStatus, sendRazorpayCheckout } from './razorpay';
 import { sendButtons, sendText } from './whatsapp';
 
 /* ------------------------------------------------------------------ *
@@ -41,22 +57,244 @@ interface Inbound {
   messageId: string;
   text?: string;
   replyId?: string;
+  /** Catalog retailer ids from a sent cart — see parseInbound. */
+  orderItems?: string[];
+  /** Present only on the first message of a Click-to-WhatsApp conversation. */
+  referral?: Referral;
+  /** Delivery receipts for our own sends — no shopper action behind them. */
+  statuses?: Record<string, unknown>[];
 }
 
 
 async function route(env: Env, msg: Inbound): Promise<void> {
+  /*
+   * Delivery receipts carry no shopper action, so they never touch state or
+   * the flow — they are recorded and the function returns. Everything the
+   * Delivery and cost tiles report comes from these rows: whether a message
+   * arrived, whether it was read, and which category Meta billed it as.
+   */
+  if (msg.statuses) {
+    const analytics = getAnalytics(env);
+    for (const s of msg.statuses) {
+      const pricing = (s.pricing ?? {}) as Record<string, unknown>;
+      const errors = (s.errors ?? []) as Record<string, unknown>[];
+      await analytics.status({
+        wamid: String(s.id ?? ''),
+        waId: s.recipient_id ? String(s.recipient_id) : undefined,
+        status: String(s.status ?? ''),
+        billable: typeof pricing.billable === 'boolean' ? pricing.billable : undefined,
+        pricingCategory: pricing.category ? String(pricing.category) : undefined,
+        pricingType: pricing.type ? String(pricing.type) : undefined,
+        errorCode: errors[0]?.code ? Number(errors[0].code) : undefined,
+        errorTitle: errors[0]?.title ? String(errors[0].title) : undefined,
+        timestamp: s.timestamp ? new Date(Number(s.timestamp) * 1000).toISOString() : undefined,
+      });
+    }
+    return;
+  }
+
   const to = msg.waId;
   const state = await loadState(env, to);
+
+  /*
+   * Attribution, captured before anything else runs.
+   *
+   * A CTWA referral rides on the first message only, and the prefilled-link
+   * code is stripped from the text below — so both have to be read here, while
+   * the original message is still intact.
+   */
+  const source = readEntrySource(msg.text, msg.referral);
+  const analytics = getAnalytics(env);
+
+  /*
+   * The session row has to exist before anything can be written against it.
+   * Nothing else inserts it, so a missing openSession() here turns every
+   * later update into a no-op against a row that was never there — which is
+   * exactly how a dashboard ends up reading zero while the bot works fine.
+   */
+  const newSession = !state.sessionId;
+  if (newSession) state.sessionId = crypto.randomUUID();
+  const sessionId = state.sessionId!;
+  if (newSession) await analytics.openSession(sessionId, to);
+
+  // The body rides in `meta`, which the generated events.body column reads.
+  await analytics.inbound({
+    waId: to,
+    sessionId,
+    wamid: msg.messageId,
+    flowStep: state.step,
+    messageType: msg.replyId ? 'interactive' : msg.orderItems ? 'order' : 'text',
+    payloadId: msg.replyId,
+    meta: msg.text ? { body: msg.text } : undefined,
+  });
 
   try {
     if (msg.replyId) {
       await handleReply(env, to, state, msg.replyId);
+    } else if (msg.orderItems) {
+      await handleOrder(env, to, state, msg.orderItems);
     } else if (msg.text !== undefined) {
-      await handleText(env, to, state, msg.text);
+      await handleText(env, to, state, stripSourceCode(msg.text));
     }
   } finally {
+    /*
+     * After the handler, because a greeting resets the session and mints a
+     * new id — recording against the old one would attribute the ad to a
+     * journey the shopper already abandoned.
+     */
+    if (state.sessionId && state.sessionId !== sessionId) {
+      await analytics.openSession(state.sessionId, to);
+    }
+    const current = state.sessionId ?? sessionId;
+
+    if (newSession || source.entry_source !== 'organic') {
+      await recordEntrySource(env, current, source);
+    }
+
+    // Everything the funnel counts, written once per message rather than at
+    // each step: the state object already holds the furthest point reached.
+    await analytics.patchSession(current, {
+      occasion: state.occasion,
+      category: state.category,
+      lastStep: state.step,
+      looksShown: state.shownLookIds.length,
+      productsShown: state.shownLookIds,
+      productPicked: state.currentLookId,
+    });
+
     await saveState(env, to, state);
   }
+}
+
+/**
+ * A cart sent from the product page.
+ *
+ * WhatsApp's cart is a message, not an order — it reaches the business and
+ * stops there, with no size and no payment attached. This is where the sale
+ * is picked up: size first, then a checkout link.
+ */
+async function handleOrder(
+  env: Env,
+  to: string,
+  state: State,
+  retailerIds: string[],
+): Promise<void> {
+  const all = await getProducts(env);
+  const byId = new Map(all.map((p) => [p.id, p]));
+  const items = retailerIds.map((id) => byId.get(id)).filter((p): p is Product => Boolean(p));
+
+  if (items.length === 0) {
+    console.log('[order:unmatched]', JSON.stringify(retailerIds));
+    await sendText(env, to, COPY.cartEmpty);
+    return;
+  }
+
+  if (state.sessionId) await markCartSent(env, state.sessionId);
+
+  /*
+   * The basket is MERGED with whatever is already being sized, not replaced.
+   *
+   * WhatsApp does not empty the shopper's cart after they send it, so the same
+   * cart can arrive again mid-flow — re-sent by hand, redelivered by Meta, or
+   * sent again with one more garment added. Rebuilding from scratch threw away
+   * every size already chosen, which showed up as the count going backwards:
+   * "2 of 4 sized" followed by "2 of 5 sized".
+   *
+   * Keeping the sizes makes a repeated cart harmless, and an added garment
+   * simply joins the queue with the rest still sized.
+   */
+  /*
+   * Sizes are carried over only while a basket is genuinely MID-SIZING —
+   * some lines sized, some not. A basket where everything already has a size
+   * has been through checkout, and a cart sent after that is a new shop, not
+   * a continuation: reusing those sizes skipped the questions entirely and
+   * went straight to Buy Now.
+   */
+  const previous = await loadCart(env, to);
+  const midSizing = previous.length > 0 && previous.some((l) => !l.size);
+  const alreadySized = new Map(
+    midSizing ? previous.map((l) => [l.productId, l.size] as const) : [],
+  );
+  const resent = alreadySized.size > 0;
+
+  const cart: CartLine[] = items.map((p) => ({
+    productId: p.id,
+    title: p.title,
+    priceINR: p.priceINR,
+    size: alreadySized.get(p.id),
+  }));
+  await saveCart(env, to, cart);
+
+  console.log(
+    '[cart:received]',
+    `items=${items.length}`,
+    `carried=${cart.filter((l) => l.size).length}`,
+    resent ? 'merged with a basket already in progress' : 'new basket',
+  );
+
+  // Greeted once per basket, and not at all when the same one arrives twice —
+  // the shopper is mid-way through sizing and has not just walked in.
+  if (!resent) await sendText(env, to, COPY.cartReceived);
+  await sizeNextLine(env, to, state, all);
+}
+
+/**
+ * Sizes the basket one garment at a time, then checks out once.
+ *
+ * Called after every size is chosen, so a four-piece cart asks four times and
+ * charges once. Without the loop the first size ended the flow and the other
+ * three garments were silently dropped — the shopper paid for one of the four
+ * things they had chosen.
+ */
+async function sizeNextLine(
+  env: Env,
+  to: string,
+  state: State,
+  all: Product[],
+): Promise<void> {
+  const cart = await loadCart(env, to);
+  const unsized = cart.filter((l) => !l.size);
+  const byId = new Map(all.map((p) => [p.id, p]));
+
+  console.log('[cart:next]', `lines=${cart.length}`, `unsized=${unsized.length}`);
+
+  if (unsized.length === 0) {
+    const lines = cart
+      .filter((l): l is CartLine & { size: string } => Boolean(l.size))
+      .map((l) => ({
+        productId: l.productId,
+        title: l.title,
+        size: l.size,
+        priceINR: l.priceINR,
+      }));
+
+    if (!lines.length) {
+      await sendText(env, to, COPY.cartEmpty);
+      return;
+    }
+
+    await sendRazorpayCheckout(env, to, state, lines);
+    return;
+  }
+
+  // One left: no point asking which. Straight to its size list.
+  if (unsized.length === 1) {
+    const product = byId.get(unsized[0].productId);
+    if (product) {
+      await askSize(env, to, state, product);
+      return;
+    }
+    // The catalogue no longer has it — drop the line rather than stall.
+    unsized[0].size = 'unavailable';
+    await sizeNextLine(env, to, state, all);
+    return;
+  }
+
+  const remaining = unsized
+    .map((l) => byId.get(l.productId))
+    .filter((p): p is Product => Boolean(p));
+
+  await askCartPick(env, to, state, remaining, cart.length - unsized.length);
 }
 
 async function handleReply(env: Env, to: string, state: State, replyId: string): Promise<void> {
@@ -92,7 +330,52 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
       await askOccasion(env, to, state);
       return;
     }
-    await sendCheckout(env, to, state, product, size);
+
+    /*
+     * A size against a basket line records it and moves to the next unsized
+     * garment; the payment happens once, at the end. A size chosen outside a
+     * basket — straight off a look — is a basket of one and checks out
+     * immediately, which is the same code path with nothing left to ask.
+     */
+    /*
+     * Matched loosely on purpose. A basket line is found even if it already
+     * carries a size — a shopper who reopens an earlier size list and changes
+     * their mind should update that line, not start a second checkout for the
+     * same garment.
+     */
+    const cart = await loadCart(env, to);
+    const line = cart.find((l) => l.productId === productId && !l.size)
+      ?? cart.find((l) => l.productId === productId);
+
+    console.log(
+      '[cart:size]',
+      productId,
+      size,
+      `cart=${cart.length}`,
+      `matched=${Boolean(line)}`,
+      `unsized=${cart.filter((l) => !l.size).length}`,
+    );
+
+    if (line) {
+      /*
+       * The array is rebuilt and reassigned rather than the element mutated
+       * in place. Mutating through a reference works only while `cart` and
+       * `state.cart` are the same object, which is one refactor away from
+       * silently not being true — and the symptom is a size that vanishes and
+       * a picker that never shrinks.
+       */
+      await saveCart(
+        env,
+        to,
+        cart.map((l) => (l.productId === productId && l === line ? { ...l, size } : l)),
+      );
+      await sizeNextLine(env, to, state, all);
+      return;
+    }
+
+    await sendRazorpayCheckout(env, to, state, [
+      { productId, title: product.title, size, priceINR: product.priceINR },
+    ]);
     return;
   }
 
@@ -112,12 +395,21 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
       return;
     case 'act:callback': {
       /*
-       * Nothing here records the request: the log line below is its only
-       * trace, and `wrangler tail` shows it solely while someone is watching.
-       * The shopper's wa_id is the number to ring.
+       * The request goes to the database, which is what puts it on the
+       * dashboard's "Call these people" queue. The log line stays as a
+       * fallback: with Supabase unconfigured the write no-ops, and a promise
+       * of a call within 24 hours should not vanish silently.
        */
+      const stored = await recordCallbackRequest(env, {
+        waId: to,
+        sessionId: state.sessionId,
+        occasion: state.occasion,
+        category: state.category,
+        productsSeen: state.shownLookIds,
+      });
       console.log(
         '[stylist:callback]',
+        stored ? 'queued' : 'LOG ONLY — not stored',
         JSON.stringify({
           waId: to,
           occasion: state.occasion ?? null,
@@ -132,6 +424,7 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
       return;
     }
     case 'act:main_menu': {
+      await clearCart(env, to);
       // A clean restart: unlike act:restart_occasion this carries no occasion
       // over, so whatever the shopper picks next is what the search runs on.
       Object.assign(state, freshState());
@@ -147,6 +440,7 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
       return;
     }
     case 'act:end':
+      await clearCart(env, to);
       await sendText(env, to, COPY.goodbye);
       await clearState(env, to);
       Object.assign(state, freshState());
@@ -166,10 +460,12 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
 const GREETING = /^\s*(hi+|hey+|hell?o+|start|menu|restart|namaste|hola)\b/i;
 
 async function handleText(env: Env, to: string, state: State, text: string): Promise<void> {
-  if (state.step === 'checkout') {
-    await confirmOrder(env, to, state);
-    return;
-  }
+  /*
+   * Nothing here confirms an order. `step === 'checkout'` used to treat any
+   * typed message as "I paid" and send the confirmation — which, now that a
+   * real payment link is on the other side of that button, would announce a
+   * payment that never happened. Only Razorpay's webhook confirms.
+   */
 
   if (GREETING.test(text) || state.step === 'welcome' || state.step === 'done') {
     Object.assign(state, freshState());
@@ -209,6 +505,19 @@ async function handleText(env: Env, to: string, state: State, text: string): Pro
     }
   }
 
+  /*
+   * Everything above matched nothing, so this is something the bot cannot
+   * answer. Recorded here and only here — a shopper who typed "Tops" was
+   * served by the shortcut above and is not a miss. What lands in this table
+   * is the list of things customers want that the flow does not offer.
+   */
+  await recordSearchMiss(env, {
+    waId: to,
+    sessionId: state.sessionId,
+    raw: text,
+    flowStep: state.step,
+  });
+
   switch (state.step) {
     case 'category':
       await sendText(env, to, COPY.tapAnOption);
@@ -235,7 +544,15 @@ function parseInbound(body: any): Inbound | null {
 
   // Delivery / read receipts arrive on the same webhook field — ignore them.
   if (!Array.isArray(value.messages) || value.messages.length === 0) {
-    if (value.statuses) console.log('[inbound:status]', JSON.stringify(value.statuses));
+    /*
+     * Delivery receipts. Previously logged and dropped, which is why delivery
+     * rate and message cost read zero: sent/delivered/read/failed and the
+     * billing category all arrive here and nowhere else.
+     */
+    if (value.statuses) {
+      console.log('[inbound:status]', JSON.stringify(value.statuses));
+      return { waId: '', messageId: '', statuses: value.statuses };
+    }
     return null;
   }
 
@@ -244,15 +561,46 @@ function parseInbound(body: any): Inbound | null {
   const messageId: string | undefined = message.id;
   if (!waId || !messageId) return null;
 
+  /*
+   * Click-to-WhatsApp attribution. Meta attaches `referral` to the FIRST
+   * message of a conversation started from an ad and never again, so it is
+   * lifted here — on any message type, because the ad can land the shopper
+   * straight onto a button.
+   */
+  const referral: Referral | undefined = message.referral
+    ? {
+        source_type: message.referral.source_type,
+        source_id: message.referral.source_id,
+        source_url: message.referral.source_url,
+        ctwa_clid: message.referral.ctwa_clid,
+        headline: message.referral.headline,
+      }
+    : undefined;
+  if (referral) console.log('[inbound:referral]', JSON.stringify(referral));
+
   if (message.type === 'text') {
-    return { waId, messageId, text: String(message.text?.body ?? '') };
+    return { waId, messageId, referral, text: String(message.text?.body ?? '') };
   }
 
   if (message.type === 'interactive') {
     const replyId =
       message.interactive?.list_reply?.id ?? message.interactive?.button_reply?.id ?? undefined;
-    if (replyId) return { waId, messageId, replyId: String(replyId) };
+    if (replyId) return { waId, messageId, referral, replyId: String(replyId) };
     return null;
+  }
+
+  if (message.type === 'order') {
+    /*
+     * A cart sent from the product page. Items carry the catalog
+     * `retailer_id`, which is our product id — but no size, because the
+     * catalog holds one entry per product rather than one per variant.
+     * The size is asked for in chat before checkout.
+     */
+    const orderItems: string[] = (message.order?.product_items ?? [])
+      .map((item: { product_retailer_id?: string }) => String(item.product_retailer_id ?? ''))
+      .filter(Boolean);
+    console.log('[inbound:order]', orderItems.length, JSON.stringify(orderItems));
+    return { waId, messageId, referral, orderItems };
   }
 
   if (message.type === 'button') {
@@ -260,7 +608,7 @@ function parseInbound(body: any): Inbound | null {
     // than under `interactive`. The routing id is in `payload`; `text` is only
     // the visible button label.
     const payload = message.button?.payload;
-    if (payload) return { waId, messageId, replyId: String(payload) };
+    if (payload) return { waId, messageId, referral, replyId: String(payload) };
     return { waId, messageId, text: String(message.button?.text ?? '') };
   }
 
@@ -286,6 +634,56 @@ export default {
     const url = new URL(request.url);
     // Tolerate a trailing slash — "/webhook/" is an easy thing to paste into Meta.
     const path = url.pathname.replace(/\/+$/, '') || '/';
+
+    /*
+     * Runs the nightly job now. The cron fires at 02:30 IST; waiting for that
+     * to find out whether a pull works is not a debugging strategy.
+     */
+    if (path === '/admin/pull' && request.method === 'GET') {
+      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      return new Response(JSON.stringify(await runJobs(env), null, 2), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    // Reports whether the analytics writes actually work, rather than leaving
+    // a silent failure to look identical to an empty table.
+    if (path === '/admin/analytics' && request.method === 'GET') {
+      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      return new Response(JSON.stringify(await analyticsProbe(env), null, 2), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
+
+    // The dashboard. Token-gated inside handleDashboard, which also serves
+    // /dashboard/api, /dashboard/plain and the mark-called write.
+    if (path === '/dashboard' || path.startsWith('/dashboard/')) {
+      return handleDashboard(request, env, path);
+    }
+
+    // Razorpay's payment webhook. Signature-checked inside the handler, so it
+    // sits ahead of the admin routes and needs no VERIFY_TOKEN.
+    if (path === '/webhooks/razorpay' && request.method === 'POST') {
+      return handleRazorpayWebhook(env, request);
+    }
+
+    // Reports whether the keys are set, and which mode they are — without
+    // printing the secret. Useful before a first test.
+    if (path === '/admin/razorpay' && request.method === 'GET') {
+      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      return new Response(JSON.stringify(await razorpayStatus(env), null, 2), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      });
+    }
 
     if (path === '/' && request.method === 'GET') {
       return new Response('Reistor AI Stylist is running. Webhook lives at /webhook.', {
@@ -331,7 +729,16 @@ export default {
     if (msg) {
       ctx.waitUntil(
         (async () => {
-          if (await alreadyHandled(env, msg.messageId)) {
+          /*
+           * Status batches carry no message id of their own, so they skip the
+           * dedupe entirely. Running them through it would cache the empty
+           * string on the first batch and discard every receipt after it —
+           * leaving delivery and cost permanently reading one message.
+           *
+           * Repeats are harmless here: the events table is unique on
+           * (wamid, status), so the same receipt twice is one row.
+           */
+          if (!msg.statuses && (await alreadyHandled(env, msg.messageId))) {
             console.log('[inbound:duplicate]', msg.messageId);
             return;
           }
@@ -346,5 +753,21 @@ export default {
 
     // Meta expects a fast 200 regardless of what happens downstream.
     return new Response('EVENT_RECEIVED', { status: 200 });
+  },
+
+  /*
+   * The nightly job. Reads only — Shopify orders, and two authenticated GETs
+   * against our own WABA for template performance and account health. Nothing
+   * here sends a message, so nothing here can affect the number's standing.
+   *
+   * Scheduled for 21:00 UTC, which is 02:30 IST: after the day's trading has
+   * settled and before anyone opens the dashboard.
+   */
+  async scheduled(_event: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(
+      runJobs(env).catch((err) => {
+        console.log('[jobs:error]', String(err));
+      }),
+    );
   },
 } satisfies ExportedHandler<Env>;

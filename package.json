@@ -7,7 +7,8 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "typecheck": "tsc --noEmit",
-    "build": "wrangler deploy --dry-run --outdir dist"
+    "build": "wrangler deploy --dry-run --outdir dist",
+    "dashboard:preview": "esbuild tools/preview-dashboard.ts --bundle --platform=node --format=esm --loader:.json=json --outfile=node_modules/.cache/preview.mjs --log-level=error && node node_modules/.cache/preview.mjs > web/dashboard.preview.html"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^5.20260811.1",

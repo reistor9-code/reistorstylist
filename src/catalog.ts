@@ -10,6 +10,12 @@ import catalog from './products.json';
 export interface SizeStock {
   size: string;
   stock: number;
+  /**
+   * Shopify variant id. The checkout permalink is built from this, so a size
+   * without one cannot be bought directly. Optional because items cached
+   * before variant ids were carried will not have it.
+   */
+  variantId?: string;
 }
 
 export interface Product {
@@ -94,6 +100,7 @@ export const FABRIC_TERMS = [
 ] as const;
 
 export interface ShopifyVariant {
+  id: number;
   sku: string;
   title: string;
   price: string;
@@ -133,9 +140,11 @@ export function mapShopifyProduct(p: ShopifyProduct): Product | null {
     CATEGORY_TERMS[typeKey] ?? tags.map((t) => CATEGORY_TERMS[t]).find(Boolean) ?? null;
   if (!category) return null;
 
-  const sizes = (p.variants ?? [])
-    .map((v) => ({ size: variantSize(v.title), stock: v.inventory_quantity }))
-    .filter((s): s is SizeStock => Boolean(s.size));
+  const sizes: SizeStock[] = (p.variants ?? []).flatMap((v) => {
+    const size = variantSize(v.title);
+    if (!size) return [];
+    return [{ size, stock: v.inventory_quantity, variantId: v.id ? String(v.id) : undefined }];
+  });
   if (!sizes.length) return null;
 
   const fabric = FABRIC_TERMS.find((f) => tags.includes(f)) ?? 'natural fabric';
@@ -229,40 +238,92 @@ export const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL'
 export const OCCASIONS = [
   {
     id: 'work',
-    label: 'Work & Meeting',
+    label: 'Work & Meetings',
     phrase: 'long meeting days',
-    blurb: 'Tailored hemp and linen shirting, cut for long days of back-to-back meetings.',
+    blurb: 'Refined silhouettes that keep comfort in mind.',
     image: 'https://picsum.photos/seed/occ-work/1080/1080',
   },
   {
     id: 'vacation',
     label: 'Vacation & Travel',
     phrase: 'packing light',
-    blurb: 'Breathable modal and Tencel pieces that pack flat and travel well.',
+    blurb: 'Stylish, comfortable pieces made for days away and perfect photo ops.',
     image: 'https://picsum.photos/seed/occ-vacation/1080/1080',
   },
   {
     id: 'casual',
-    label: 'Casual & Brunch',
+    label: 'Weekend & Brunch',
     phrase: 'slow weekend plans',
-    blurb: 'Relaxed shapes in hemp and cotton for slow weekend plans.',
+    blurb: 'Easy styles for relaxed mornings and plans that follow.',
     image: 'https://picsum.photos/seed/occ-casual/1080/1080',
   },
   {
     id: 'dinner',
     label: 'Dinner Date',
     phrase: 'evening plans',
-    blurb: 'Bias-cut Tencel and linen with a quiet shine for evening plans.',
+    blurb: 'Romantic styles that make you look and feel amazing.',
     image: 'https://picsum.photos/seed/occ-dinner/1080/1080',
   },
   {
     id: 'lounge',
     label: 'Loungewear',
     phrase: 'quiet days at home',
-    blurb: 'Soft modal and cotton made for quiet days spent at home.',
+    blurb: 'The comfiest styles to lounge in, step out in, and feel great in all day long.',
     image: 'https://picsum.photos/seed/occ-lounge/1080/1080',
   },
 ] as const;
+
+/**
+ * Category card copy, written per occasion — the same six categories read
+ * differently for a meeting than for a beach.
+ *
+ * These strings are frozen inside the five approved `category_picker_<id>`
+ * templates, so nothing here is sent at runtime. They live in code as the
+ * record of what was approved, and as the input to /admin/retemplate when a
+ * new version is submitted.
+ */
+export const CATEGORY_BLURBS: Record<string, Record<string, string>> = {
+  work: {
+    tops: 'Polished staples in breathable fabrics.',
+    dresses: 'From desk to dinner, beautifully.',
+    bottoms: 'Polished, comfortable and easy to style.',
+    jackets: 'Light layers that pull a look together.',
+    jumpsuits: 'One-piece dressing, beautifully done.',
+    coords: 'A polished look, already matched.',
+  },
+  vacation: {
+    tops: 'Easy staples for days away.',
+    dresses: 'Made for sunny days and perfect photo ops.',
+    bottoms: 'Light, comfortable and easy to pack.',
+    jackets: 'Light layers for cooler evenings.',
+    jumpsuits: 'Easy one-piece dressing for your getaway.',
+    coords: 'Travel-ready sets that make packing easy.',
+  },
+  casual: {
+    tops: 'Easy styles for relaxed days.',
+    dresses: 'Pretty, comfortable and made for brunch.',
+    bottoms: 'Relaxed styles with plenty of room to move.',
+    jackets: 'Easy layers for cooler days.',
+    jumpsuits: 'One-piece dressing made easy.',
+    coords: 'Matching styles for an easy weekend look.',
+  },
+  dinner: {
+    tops: 'Feminine styles made for evenings out.',
+    dresses: 'Romantic styles that make every occasion feel special.',
+    bottoms: 'Elegant styles made for dinner and drinks.',
+    jackets: 'Light layers for cooler evenings.',
+    jumpsuits: 'Flattering one-pieces made for date night.',
+    coords: 'Beautiful matching styles for an evening out.',
+  },
+  lounge: {
+    tops: 'The comfiest tops for lounging or going out.',
+    dresses: 'Soft, comfortable dresses for all-day wear.',
+    bottoms: 'Relaxed fits made for comfort all day.',
+    jackets: 'Easy layers for cooler days, at home or out.',
+    jumpsuits: "Comfortable one-pieces you'll want to live in.",
+    coords: 'The comfiest matching sets for home and beyond.',
+  },
+};
 
 export const CATEGORIES = [
   {
@@ -327,8 +388,21 @@ export function filterProducts(all: Product[], occasion?: string, category?: str
 
 /** GoKwik / reistor.in checkout deep link for a specific size. */
 export function checkoutUrl(product: Product, size: string): string {
-  const url = new URL(product.productUrl);
-  url.searchParams.set('variant', size);
+  const variantId = product.sizes.find((s) => s.size === size)?.variantId;
+  const origin = new URL(product.productUrl).origin;
+
+  /*
+   * Shopify's cart permalink — /cart/<variant_id>:<qty> — drops the shopper
+   * straight into checkout with the size already chosen, which is where GoKwik
+   * takes over. A size label in `?variant=` does nothing; the id is required.
+   *
+   * Without one — an item cached before variant ids were carried — fall back
+   * to the product page rather than sending anyone to a broken cart.
+   */
+  const url = variantId
+    ? new URL(`/cart/${variantId}:1`, origin)
+    : new URL(product.productUrl);
+
   url.searchParams.set('utm_source', 'whatsapp');
   url.searchParams.set('utm_medium', 'ai-stylist');
   return url.toString();

@@ -12,9 +12,11 @@ import {
   occasionLabel,
   occasionPhrase,
 } from './catalog';
-import { rankLooks } from './ranking';
+import { rankLayers } from './ranking';
 import {
+  LIMITS,
   sendButtons,
+  pause,
   sendCarouselTemplate,
   sendCatalogMessage,
   sendCtaUrl,
@@ -29,10 +31,24 @@ export const STATE_TTL_SECONDS = 60 * 60 * 24 * 7;
 export function freshState(): State {
   return {
     step: 'welcome',
+    // A new journey each time the flow restarts, so the funnel counts a
+    // shopper who comes back next week as a second session rather than
+    // reopening the first one.
+    sessionId: crypto.randomUUID(),
     offset: 0,
     shownLookIds: [],
     rankedIds: [],
     reasons: {},
+    /*
+     * Named explicitly even though they are empty.
+     *
+     * Resets are done with Object.assign(state, freshState()), which copies
+     * only the keys freshState() HAS — so a field omitted here survives every
+     * reset, which is how stale picks outlived Main Menu.
+     */
+    currentLookId: undefined,
+    occasion: undefined,
+    category: undefined,
     updatedAt: Date.now(),
   };
 }
@@ -88,17 +104,31 @@ export async function askOccasion(env: Env, to: string, state: State): Promise<v
 export async function askCategory(env: Env, to: string, state: State): Promise<void> {
   state.step = 'category';
 
-  const sent = await sendCarouselTemplate(
-    env,
-    to,
-    env.CATEGORY_TEMPLATE || 'category_picker',
-    CATEGORIES.map((c) => ({
-      imageUrl: c.image,
-      bodyParams: [],
-      payload: `cat:${c.id}`,
-    })),
-  );
-  if (sent) return;
+  /*
+   * One category template per occasion. The same six categories are described
+   * differently for a meeting than for a beach, and card copy is frozen at
+   * approval — so the wording can only vary by sending a different template.
+   *
+   * Names follow `<base>_<occasionId>`: category_picker_work, _vacation,
+   * _casual, _dinner, _lounge. The shared base is the fallback for a session
+   * with no occasion set, and for a per-occasion template that is missing or
+   * paused — that send is rejected, and the code below drops to a typed
+   * prompt rather than leaving the shopper with nothing.
+   */
+  const base = env.CATEGORY_TEMPLATE || 'category_picker';
+  const cards = CATEGORIES.map((c) => ({
+    imageUrl: c.image,
+    bodyParams: [],
+    payload: `cat:${c.id}`,
+  }));
+
+  if (state.occasion) {
+    const perOccasion = `${base}_${state.occasion}`;
+    if (await sendCarouselTemplate(env, to, perOccasion, cards)) return;
+    console.log('[carousel:rejected]', perOccasion, '— falling back to', base);
+  }
+
+  if (await sendCarouselTemplate(env, to, base, cards)) return;
 
   console.log('[carousel:rejected] category');
   await sendText(env, to, COPY.categoryTypePrompt);
@@ -245,7 +275,26 @@ export function widenCandidates(
 
 export async function runBackend(env: Env, to: string, state: State): Promise<void> {
   const all = await getProducts(env);
-  const { products: candidates, intro } = widenCandidates(all, state.occasion, state.category);
+  const { intro } = widenCandidates(all, state.occasion, state.category);
+
+  /*
+   * Two layers, and CATEGORY IS NEVER RELAXED: the exact brief first, then the
+   * same category for any occasion.
+   *
+   * An earlier version also fell through to "same occasion, any category" and
+   * then to the whole shelf, which is how a shopper who asked for Bottoms was
+   * shown a dress and two tops under a header still reading "Dinner Date ·
+   * Bottoms". Occasion is a soft preference; category is what they actually
+   * chose, and widening it makes the recommendation look broken.
+   *
+   * Layering still gives "Show More Looks" somewhere to go — there are far
+   * more bottoms in the catalogue than bottoms tagged for one occasion.
+   */
+  const layers = [
+    filterProducts(all, state.occasion, state.category),
+    filterProducts(all, undefined, state.category),
+  ];
+  const candidates = layers.flat();
 
   if (candidates.length === 0) {
     // Only reachable when every product in the catalog is sold out.
@@ -257,7 +306,7 @@ export async function runBackend(env: Env, to: string, state: State): Promise<vo
     return;
   }
 
-  const ranking = rankLooks(candidates, state.occasion);
+  const ranking = rankLayers(layers, state.occasion);
   state.rankedIds = ranking.order;
   state.reasons = ranking.reasons;
   state.offset = 0;
@@ -279,7 +328,7 @@ export async function showMoreLooks(env: Env, to: string, state: State): Promise
 
   if (state.offset >= state.rankedIds.length) {
     await sendButtons(env, to, COPY.noMoreLooks, [
-      { id: 'act:browse', title: 'Browse Category' },
+      { id: 'act:browse', title: 'Browse Catalog' },
       { id: 'act:callback', title: 'Talk to Stylist' },
       { id: 'act:main_menu', title: 'Main Menu' },
     ]);
@@ -305,7 +354,7 @@ export async function askSize(env: Env, to: string, state: State, product: Produ
   if (sizes.length === 0) {
     await sendButtons(env, to, `${product.title} is out of stock in every size right now.`, [
       { id: 'act:more', title: 'Show More Looks' },
-      { id: 'act:browse', title: 'Browse Category' },
+      { id: 'act:browse', title: 'Browse Catalog' },
     ]);
     return;
   }
@@ -341,7 +390,9 @@ export async function sendCheckout(
     'Buy Now',
     checkoutUrl(product, size),
   );
-  await sendButtons(env, to, COPY.afterCheckout, [{ id: 'act:paid', title: 'Order Placed' }]);
+
+  // Nothing follows the button. The shopper is about to be in a browser
+  // typing card details, and a second message there is noise at best.
 }
 
 export async function confirmOrder(env: Env, to: string, state: State): Promise<void> {
@@ -379,7 +430,45 @@ export async function openCatalogue(
   const sent = cover ? await sendCatalogMessage(env, to, COPY.browseCatalog, cover) : false;
   if (!sent) console.log('[catalog-message:rejected]', `catalog=${env.CATALOG_ID ?? 'unset'}`);
 
+  // The card has to land before the menu that sits under it.
+  if (sent) await pause();
+
   await sendButtons(env, to, sent ? COPY.whatNext : COPY.catalogUnavailable, [
     { id: 'act:main_menu', title: 'Main Menu' },
   ]);
+}
+
+/**
+ * More than one piece in the bag. Sizes are per garment, so they are worked
+ * one at a time — the row id runs into the same `look:` handler the size list
+ * hangs off.
+ */
+/**
+ * Asks which garment to size next.
+ *
+ * No greeting here: this is called once per remaining piece, and repeating
+ * "Your bag is here" on the third pass reads as if the flow has restarted.
+ * The body carries the count instead, so the shopper can see the list is
+ * finite and shrinking rather than looping forever.
+ */
+export async function askCartPick(
+  env: Env,
+  to: string,
+  state: State,
+  items: Product[],
+  sized = 0,
+): Promise<void> {
+  const total = sized + items.length;
+  await sendList(env, to, {
+    header: COPY.sizeHeader,
+    body: sized
+      ? fill(COPY.cartPickNext, { done: String(sized), total: String(total) })
+      : COPY.cartPick,
+    button: 'Pick item',
+    rows: items.slice(0, LIMITS.maxRows).map((p) => ({
+      id: `look:${p.id}`,
+      title: p.title,
+      description: `${formatINR(p.priceINR)} · ${cap(p.fabric)}`,
+    })),
+  });
 }

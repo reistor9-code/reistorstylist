@@ -1,4 +1,5 @@
 import type { Env } from './types';
+import { getAnalytics } from './analytics/log';
 
 /* ------------------------------------------------------------------ *
  * WhatsApp send helpers
@@ -21,6 +22,33 @@ export function clip(text: string, max: number): string {
   return t.length <= max ? t : `${t.slice(0, max - 1).trimEnd()}…`;
 }
 
+/**
+ * A human-readable line for what we just sent.
+ *
+ * Without this the transcript shows the shopper's half of the conversation
+ * and blank placeholders for ours, which answers none of the questions the
+ * tab exists for. The text is dug out of whichever shape the message took —
+ * plain text, an interactive body, or a template name.
+ */
+function readableBody(payload: Record<string, unknown>): string {
+  const text = payload.text as { body?: string } | undefined;
+  if (text?.body) return text.body;
+
+  const interactive = payload.interactive as
+    | { type?: string; body?: { text?: string }; action?: unknown }
+    | undefined;
+  if (interactive?.body?.text) return interactive.body.text;
+  if (interactive?.type) return `[${interactive.type}]`;
+
+  const template = payload.template as { name?: string } | undefined;
+  if (template?.name) return `[template: ${template.name}]`;
+
+  const image = payload.image as { caption?: string } | undefined;
+  if (image?.caption) return image.caption;
+
+  return `[${String(payload.type ?? 'message')}]`;
+}
+
 export async function graph(env: Env, payload: Record<string, unknown>): Promise<boolean> {
   const version = env.GRAPH_API_VERSION || 'v21.0';
   const url = `https://graph.facebook.com/${version}/${env.PHONE_NUMBER_ID}/messages`;
@@ -39,6 +67,34 @@ export async function graph(env: Env, payload: Record<string, unknown>): Promise
     });
     const text = await res.text();
     console.log('[outbound:response]', res.status, text);
+
+    /*
+     * Recorded here rather than at each call site, because this is the single
+     * place every outbound message passes through — a send logged anywhere
+     * else would miss whichever helper was added next.
+     *
+     * The wamid Meta returns is what the delivery receipt arrives under later,
+     * so writing it now is what lets sent, delivered and read be joined at all.
+     */
+    let wamid: string | undefined;
+    try {
+      wamid = JSON.parse(text)?.messages?.[0]?.id;
+    } catch {
+      // A non-JSON body means the send failed; the status below still records it.
+    }
+
+    await getAnalytics(env).outbound({
+      meta: { body: readableBody(payload) },
+      waId: typeof payload.to === 'string' ? payload.to : undefined,
+      wamid,
+      messageType: typeof payload.type === 'string' ? payload.type : undefined,
+      templateName:
+        typeof payload.template === 'object' && payload.template
+          ? String((payload.template as Record<string, unknown>).name ?? '')
+          : undefined,
+      ok: res.ok,
+    });
+
     return res.ok;
   } catch (err) {
     console.log('[outbound:error]', String(err));
@@ -196,6 +252,19 @@ export async function sendCatalogMessage(
     },
   });
 }
+
+/**
+ * A breath between two sends to the same person.
+ *
+ * Awaiting graph() only confirms Meta ACCEPTED a message, not that it
+ * delivered it — two sends inside the same second can arrive either way
+ * round, which is how a follow-up menu appeared above the card it belongs
+ * under. A short gap is the only ordering guarantee available.
+ *
+ * Also keeps us clear of error 131056, which is thrown for more than one
+ * message per six seconds to the same recipient.
+ */
+export const pause = (ms = 1200) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Falls back to a text message if Meta cannot fetch the image URL. */
 export async function sendImage(env: Env, to: string, imageUrl: string, caption: string): Promise<boolean> {

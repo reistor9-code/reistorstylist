@@ -36,7 +36,7 @@ PDP_IMAGE_METAFIELD = "custom.kwikengage_product_image"
 # Occasion / category pickers are approved carousel Marketing templates,
 # billed at ~₹0.86 per delivered message (Meta's test number does not bill).
 # A rejected send falls back to asking for a typed answer, not to a list.
-OCCASION_TEMPLATE = "occasion_picker"
+OCCASION_TEMPLATE = "occasion_picker_v2"
 CATEGORY_TEMPLATE = "category_picker"
 TEMPLATE_LANGUAGE = "en_US"
 
@@ -50,3 +50,18 @@ IND_SHOPIFY_API_VERSION = "2026-04"
 #   WHATSAPP_TOKEN     Meta system-user / temporary access token
 #   PHONE_NUMBER_ID    WhatsApp Business phone number id
 #   VERIFY_TOKEN       any string; must match what you paste into Meta
+
+# Keeps logs in Cloudflare for a few days and makes them searchable in the
+# dashboard, so reading them does not require a terminal open at the moment
+# something happens. Without this, logs exist only while `wrangler tail` runs.
+[observability]
+enabled = true
+head_sampling_rate = 1
+
+# The nightly job: Shopify orders, Meta template stats and account health, the
+# abandoned sweep, and a stock snapshot. 21:00 UTC is 02:30 IST.
+#
+# Reads only. Nothing on this schedule sends a WhatsApp message, so it cannot
+# affect the number's quality rating.
+[triggers]
+crons = ["0 21 * * *"]

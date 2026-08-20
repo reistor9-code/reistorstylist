@@ -1,0 +1,229 @@
+{
+  "range": {
+    "from": "2026-07-19",
+    "to": "2026-08-19",
+    "phoneNumberId": "1221684564367817"
+  },
+  "generatedAt": "2026-08-18T09:12:44.031Z",
+  "funnel": [
+    {
+      "step": "started",
+      "label": "Started a chat",
+      "sessions": 420,
+      "lostPct": 0
+    },
+    {
+      "step": "picked_occasion",
+      "label": "Picked an occasion",
+      "sessions": 380,
+      "lostPct": 9.5
+    },
+    {
+      "step": "picked_category",
+      "label": "Picked a category",
+      "sessions": 310,
+      "lostPct": 18.4
+    },
+    {
+      "step": "saw_looks",
+      "label": "Saw looks",
+      "sessions": 295,
+      "lostPct": 4.8
+    },
+    {
+      "step": "opened_product",
+      "label": "Opened a product",
+      "sessions": 141,
+      "lostPct": 52.2
+    },
+    {
+      "step": "picked_size",
+      "label": "Picked a size",
+      "sessions": 88,
+      "lostPct": 37.6
+    },
+    {
+      "step": "opened_checkout",
+      "label": "Opened checkout",
+      "sessions": 61,
+      "lostPct": 30.7
+    },
+    {
+      "step": "ordered",
+      "label": "Ordered",
+      "sessions": 34,
+      "lostPct": 44.3
+    }
+  ],
+  "topProducts": [
+    {
+      "productId": "7382019",
+      "title": "Hemp Poplin Shirt",
+      "unitsSold": 12,
+      "revenueINR": 35988,
+      "orders": 11,
+      "lastSoldAt": "2026-08-17T14:22:10Z"
+    },
+    {
+      "productId": "7382044",
+      "title": "Linen Notch Blouse",
+      "unitsSold": 9,
+      "revenueINR": 28791,
+      "orders": 9,
+      "lastSoldAt": "2026-08-18T06:40:00Z"
+    }
+  ],
+  "productConversion": [
+    {
+      "productId": "7382019",
+      "timesShown": 120,
+      "timesSized": 30,
+      "unitsSold": 12,
+      "conversionPct": 10
+    },
+    {
+      "productId": "7382044",
+      "timesShown": 98,
+      "timesSized": 21,
+      "unitsSold": 9,
+      "conversionPct": 9.2
+    },
+    {
+      "productId": "7382077",
+      "timesShown": 76,
+      "timesSized": 4,
+      "unitsSold": 0,
+      "conversionPct": 0
+    }
+  ],
+  "lostDemand": [
+    {
+      "productId": "7382101",
+      "size": "M",
+      "times": 18,
+      "lastAt": "2026-08-16T10:02:00Z"
+    },
+    {
+      "productId": "7382101",
+      "size": "L",
+      "times": 11,
+      "lastAt": "2026-08-15T18:44:00Z"
+    },
+    {
+      "productId": "7382055",
+      "size": null,
+      "times": 6,
+      "lastAt": "2026-08-14T09:10:00Z"
+    }
+  ],
+  "demandGrid": [
+    {
+      "occasion": "work",
+      "category": "tops",
+      "requests": 90,
+      "hadNothing": 4,
+      "orders": 12
+    },
+    {
+      "occasion": "casual",
+      "category": "dresses",
+      "requests": 61,
+      "hadNothing": 0,
+      "orders": 8
+    },
+    {
+      "occasion": "lounge",
+      "category": "tops",
+      "requests": 22,
+      "hadNothing": 22,
+      "orders": 0
+    }
+  ],
+  "campaigns": [
+    {
+      "templateName": "occasion_picker",
+      "sent": 400,
+      "delivered": 392,
+      "read": 300,
+      "clicked": 180,
+      "readPct": 76.5,
+      "clickPct": 45.9
+    },
+    {
+      "templateName": "category_picker",
+      "sent": 372,
+      "delivered": 366,
+      "read": 281,
+      "clicked": 152,
+      "readPct": 76.8,
+      "clickPct": 41.5
+    }
+  ],
+  "delivery": {
+    "sent": 1200,
+    "delivered": 1180,
+    "read": 900,
+    "failed": 20,
+    "deliveredPct": 98.3,
+    "readPct": 76.3
+  },
+  "cost": {
+    "billableMessages": 780,
+    "freeMessages": 420,
+    "byCategory": [
+      {
+        "category": "marketing",
+        "messages": 780
+      },
+      {
+        "category": "service",
+        "messages": 420
+      }
+    ]
+  },
+  "attrition": {
+    "optedOut": 3,
+    "abandoned": 300,
+    "droppedByStep": [
+      {
+        "step": "top3",
+        "sessions": 154
+      },
+      {
+        "step": "category",
+        "sessions": 70
+      },
+      {
+        "step": "size",
+        "sessions": 46
+      },
+      {
+        "step": "checkout",
+        "sessions": 30
+      }
+    ]
+  },
+  "health": {
+    "qualityRating": "GREEN",
+    "messagingTier": "TIER_1K",
+    "capturedAt": "2026-08-18T02:30:00Z",
+    "templates": [
+      {
+        "name": "occasion_picker",
+        "status": "APPROVED",
+        "quality": "GREEN"
+      },
+      {
+        "name": "category_picker",
+        "status": "PAUSED",
+        "quality": "RED"
+      }
+    ]
+  },
+  "revenue": {
+    "orders": 34,
+    "revenueINR": 102000,
+    "averageOrderINR": 3000,
+    "costPerOrder": 22.9
+  }
+}

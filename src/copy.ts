@@ -21,11 +21,13 @@ export function fill(template: string, values: Record<string, string>): string {
 
 export const COPY = {
   welcome:
-    "Hi there! 👋 I'm Reistor AI Stylist. I'll help you find the perfect outfit for any occasion. " +
-    "Two questions and I'll put a look together for you ✨",
-  // Both are the approved templates' body text — see createCarouselTemplates().
-  occasionHeader: "What's the occasion?",
-  categoryHeader: 'What type of clothing are you looking for?',
+    "Hi there! 👋 I'm Janvi, your Reistor Stylist. I'll ask you 2 quick questions about what " +
+    "you're looking for, then put together a look you'll love.",
+  // Both mirror the approved templates' body text. Card copy is frozen at
+  // approval, so these two are documentation and /admin/retemplate input —
+  // changing them here does not change what a shopper sees.
+  occasionHeader: 'First, what are you dressing for?',
+  categoryHeader: 'What are you looking for?',
   moreLooksIntro: 'Another round, same brief:',
   // Shown when the exact occasion × category pair is empty and the edit was
   // widened instead of dead-ended — see widenCandidates(). {placeholders} are
@@ -41,10 +43,13 @@ export const COPY = {
   whatNext: 'What next?',
   catalogUnavailable: 'The catalogue is not opening right now. Start again from the top.',
   browseCatalog: 'The full Reistor catalogue, open it and browse everything in stock.',
+  cartReceived: 'Your bag is here. Pick a size and I will open checkout.',
+  cartPick: 'Which piece would you like to size first?',
+  cartPickNext: '{done} of {total} sized. Which piece next?',
+  cartEmpty: 'Nothing came through in that bag. Tap a card above to open a look.',
   sizeHeader: 'Choose your size',
   sizeBody: 'Only sizes in stock are listed.',
   checkoutBody: 'Your size is held in the bag. Tap below to check out on reistor.in.',
-  afterCheckout: 'Tap below once you are back from checkout.',
   orderConfirmed: 'Order Confirmed! Thank you for shopping with Reistor.',
   stylistCallback: 'A stylist from our team will call you on this number within 24 hours.',
   goodbye: 'Thanks for shopping with Reistor. Message anytime for a new look ✨',
@@ -60,7 +65,7 @@ export const COPY = {
   // Only reachable if the carousel template send is rejected. The typed-name
   // shortcut in handleText() picks these up, so the flow still moves.
   occasionTypePrompt:
-    'Type the occasion you are dressing for — Work & Meeting, Vacation & Travel, Casual & Brunch, Dinner Date or Loungewear.',
+    'Type the occasion you are dressing for — Work & Meetings, Vacation & Travel, Weekend & Brunch, Dinner Date or Loungewear.',
   categoryTypePrompt:
     'Type a category to narrow the edit — Tops, Dresses, Bottoms, Jackets, Jumpsuits or Co-ord Sets.',
 } as const;
