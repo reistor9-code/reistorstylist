@@ -16,18 +16,18 @@ import type { CartLine, Env, State } from './types';
 import { clearCart, loadCart, saveCart } from './cart';
 import { handleAdmin } from './admin';
 import type { Product } from './catalog';
-import { CATEGORIES, OCCASIONS, getProducts } from './catalog';
+import { CATEGORIES, OCCASIONS, getProducts, productSku } from './catalog';
 import { COPY } from './copy';
 import {
   askCartPick,
   askCategory,
   askOccasion,
   askSize,
+  browseCategory,
   clearState,
   confirmOrder,
   freshState,
   loadState,
-  openCatalogue,
   runBackend,
   saveState,
   showMoreLooks,
@@ -383,12 +383,11 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
     case 'act:more':
       await showMoreLooks(env, to, state);
       return;
-    // Both labels lead to the same place: WhatsApp's catalogue cannot be
-    // opened on one category, so "Browse Catalog" and "Browse Category" can
-    // only ever show the same card.
+    // Two ids, one action. 'act:catalog' predates the rename and is still
+    // live in any menu a shopper had on screen before the deploy.
     case 'act:catalog':
     case 'act:browse':
-      await openCatalogue(env, to, state, all);
+      await browseCategory(env, to, state, all);
       return;
     case 'act:paid':
       await confirmOrder(env, to, state);
@@ -499,8 +498,8 @@ async function handleText(env: Env, to: string, state: State, text: string): Pro
       await showMoreLooks(env, to, state);
       return;
     }
-    if (/^(browse|catalog|catalogue)\b/.test(keyword)) {
-      await openCatalogue(env, to, state, await getProducts(env));
+    if (/^(browse|category|catalog|catalogue)\b/.test(keyword)) {
+      await browseCategory(env, to, state, await getProducts(env));
       return;
     }
   }
@@ -664,7 +663,12 @@ export default {
     // The dashboard. Token-gated inside handleDashboard, which also serves
     // /dashboard/api, /dashboard/plain and the mark-called write.
     if (path === '/dashboard' || path.startsWith('/dashboard/')) {
-      return handleDashboard(request, env, path);
+      return handleDashboard(request, env, path, async () => {
+        // Names and SKUs for the product tables. Cached in KV for ten minutes
+        // like every other catalogue read, so this costs nothing per view.
+        const all = await getProducts(env);
+        return all.map((p) => ({ id: p.id, title: p.title, sku: productSku(p) }));
+      });
     }
 
     // Razorpay's payment webhook. Signature-checked inside the handler, so it

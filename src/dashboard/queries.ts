@@ -73,11 +73,20 @@ export async function funnel(cfg: SupabaseConfig, range: Range): Promise<FunnelS
 
   return steps.map((s, i) => {
     const previous = i === 0 ? s.value : steps[i - 1].value;
+    /*
+     * Floored at zero, because these steps are counted independently rather
+     * than as a strict funnel and a later one can legitimately outrun an
+     * earlier one. A multi-item basket reaches checkout once for the whole
+     * bag while picked_size fires per garment, so "Opened checkout" has read
+     * higher than "Picked a size" — which produced a "-44.4% lost" on the
+     * page. Negative loss means nothing to whoever is reading it.
+     */
+    const lost = previous > 0 ? ((previous - s.value) / previous) * 100 : 0;
     return {
       step: s.step,
       label: s.label,
       sessions: s.value,
-      lostPct: previous > 0 ? Math.round(((previous - s.value) / previous) * 1000) / 10 : 0,
+      lostPct: Math.max(0, Math.round(lost * 10) / 10),
     };
   });
 }
@@ -169,6 +178,8 @@ export async function markCalled(
 export interface TopProduct {
   productId: string;
   title: string;
+  /** Shopify SKU, resolved from the live catalogue. Null when unknown. */
+  sku: string | null;
   unitsSold: number;
   revenueINR: number;
   orders: number;
@@ -185,6 +196,7 @@ export async function topProducts(cfg: SupabaseConfig, limit = 10): Promise<TopP
   return (res.data ?? []).map((r) => ({
     productId: String(r.product_id ?? ''),
     title: String(r.title ?? r.product_id ?? 'Unknown'),
+    sku: null,
     unitsSold: num(r.units_sold),
     revenueINR: num(r.revenue_inr),
     orders: num(r.orders),
@@ -196,6 +208,8 @@ export interface ProductConversion {
   productId: string;
   /** Null only if the product has never been seen by the logger. */
   title: string | null;
+  /** Shopify SKU, resolved from the live catalogue. Null when unknown. */
+  sku: string | null;
   timesShown: number;
   timesSized: number;
   unitsSold: number;
@@ -222,6 +236,7 @@ export async function productConversion(
   return (res.data ?? []).map((r) => ({
     productId: String(r.product_id ?? ''),
     title: (r.title as string) ?? null,
+    sku: null,
     timesShown: num(r.times_shown),
     timesSized: num(r.times_sized),
     unitsSold: num(r.units_sold),
@@ -237,6 +252,8 @@ export interface LostDemand {
   productId: string;
   /** Null only if the product has never been seen by the logger. */
   title: string | null;
+  /** Shopify SKU, resolved from the live catalogue. Null when unknown. */
+  sku: string | null;
   size: string | null;
   times: number;
   lastAt: string | null;
@@ -259,6 +276,7 @@ export async function lostDemand(cfg: SupabaseConfig, range: Range, limit = 20):
   return (res.data ?? []).map((r) => ({
     productId: String(r.product_id ?? ''),
     title: (r.title as string) ?? null,
+    sku: null,
     size: (r.size as string) ?? null,
     times: num(r.times),
     lastAt: (r.last_at as string) ?? null,
@@ -362,17 +380,26 @@ export async function delivery(cfg: SupabaseConfig, range: Range): Promise<Deliv
   const total = (key: string) => rows.reduce((sum, r) => sum + num(r[key]), 0);
 
   const sent = total('sent');
-  const delivered = total('delivered');
+  const read = total('read');
+
+  /*
+   * A message that was read was necessarily delivered, so the read count is a
+   * floor under the delivered one. Taking the larger of the two repairs a real
+   * gap: delivery receipts were dropped for a while — parseInbound() returned
+   * null for status batches — leaving messages with a read row and no
+   * delivered row. Without this, read came out at 118.6% of delivered.
+   */
+  const delivered = Math.max(total('delivered'), read);
 
   return {
     sent,
     delivered,
-    read: total('read'),
+    read,
     failed: total('failed'),
     deliveredPct: sent ? Math.round((delivered / sent) * 1000) / 10 : 0,
     // A floor, not a true rate: a shopper with read receipts disabled never
     // produces a read status, however carefully they read the message.
-    readPct: delivered ? Math.round((total('read') / delivered) * 1000) / 10 : 0,
+    readPct: delivered ? Math.round((read / delivered) * 1000) / 10 : 0,
   };
 }
 

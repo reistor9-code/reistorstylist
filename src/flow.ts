@@ -16,9 +16,7 @@ import { rankLayers } from './ranking';
 import {
   LIMITS,
   sendButtons,
-  pause,
   sendCarouselTemplate,
-  sendCatalogMessage,
   sendCtaUrl,
   sendList,
   sendProductCarousel,
@@ -211,7 +209,7 @@ export async function sendLooks(
       firstBatch
         ? [{ id: 'act:more', title: 'Show More Looks' }]
         : [
-            { id: 'act:catalog', title: 'Browse Catalog' },
+            { id: 'act:catalog', title: 'Browse Category' },
             { id: 'act:main_menu', title: 'Main Menu' },
             { id: 'act:callback', title: 'Talk to Stylist' },
           ],
@@ -328,7 +326,7 @@ export async function showMoreLooks(env: Env, to: string, state: State): Promise
 
   if (state.offset >= state.rankedIds.length) {
     await sendButtons(env, to, COPY.noMoreLooks, [
-      { id: 'act:browse', title: 'Browse Catalog' },
+      { id: 'act:browse', title: 'Browse Category' },
       { id: 'act:callback', title: 'Talk to Stylist' },
       { id: 'act:main_menu', title: 'Main Menu' },
     ]);
@@ -354,7 +352,7 @@ export async function askSize(env: Env, to: string, state: State, product: Produ
   if (sizes.length === 0) {
     await sendButtons(env, to, `${product.title} is out of stock in every size right now.`, [
       { id: 'act:more', title: 'Show More Looks' },
-      { id: 'act:browse', title: 'Browse Catalog' },
+      { id: 'act:browse', title: 'Browse Category' },
     ]);
     return;
   }
@@ -405,38 +403,82 @@ export async function confirmOrder(env: Env, to: string, state: State): Promise<
 }
 
 /**
- * The catalogue card, with one way back.
+ * The category deep-dive, behind the Browse Category button.
  *
- * WhatsApp's catalogue always opens on everything — `catalog_message` takes a
- * thumbnail id and nothing else, with no collection parameter — so the card
- * cannot be scoped to the shopper's category. The thumbnail is drawn from
- * that category instead, which is as close to a scoped card as the API allows.
+ * This used to send `catalog_message`, which could only ever open WhatsApp's
+ * entire catalogue — the message takes a thumbnail id and nothing else, with
+ * no collection parameter, so a shopper who asked for Tops was handed all of
+ * it. A product carousel can be scoped, so the button now delivers what its
+ * name promises: up to ten more pieces from the shopper's own occasion and
+ * category.
  *
- * Main Menu rides in its own message: the catalogue card carries a fixed
- * "View catalogue" button and accepts no extras.
+ * Every card still opens WhatsApp's own PDP, so Add to cart is unaffected.
+ *
+ * The six already shown are skipped. Ranked ids come first so the better
+ * matches lead, with anything the ranking never reached appended after them.
  */
-export async function openCatalogue(
+export async function browseCategory(
   env: Env,
   to: string,
   state: State,
   all: Product[],
 ): Promise<void> {
-  const cover =
-    filterProducts(all, undefined, state.category)[0]?.id ??
-    state.currentLookId ??
-    state.rankedIds[0] ??
-    filterProducts(all)[0]?.id;
+  const seen = new Set(state.shownLookIds);
+  const inBrief = filterProducts(all, state.occasion, state.category);
+  const briefIds = new Set(inBrief.map((p) => p.id));
+  const ranked = new Set(state.rankedIds);
 
-  const sent = cover ? await sendCatalogMessage(env, to, COPY.browseCatalog, cover) : false;
-  if (!sent) console.log('[catalog-message:rejected]', `catalog=${env.CATALOG_ID ?? 'unset'}`);
+  const ordered = [
+    ...state.rankedIds.filter((id) => briefIds.has(id) && !seen.has(id)),
+    ...inBrief.filter((p) => !seen.has(p.id) && !ranked.has(p.id)).map((p) => p.id),
+  ];
 
-  // The card has to land before the menu that sits under it.
-  if (sent) await pause();
-
-  await sendButtons(env, to, sent ? COPY.whatNext : COPY.catalogUnavailable, [
+  const onward = [
     { id: 'act:main_menu', title: 'Main Menu' },
-  ]);
+    { id: 'act:callback', title: 'Talk to Stylist' },
+  ];
+
+  /*
+   * Meta rejects a carousel with fewer than two cards, and a single leftover
+   * piece is not worth a message of its own after six the shopper has already
+   * turned down. Both cases end the edit rather than limping on.
+   */
+  if (ordered.length < 2) {
+    const body = fill(COPY.categoryExhausted, {
+      occasion: occasionLabel(state.occasion),
+      category: categoryLabel(state.category),
+    });
+    await sendButtons(env, to, body, onward);
+    return;
+  }
+
+  const picks = ordered.slice(0, 10);
+  const body = fill(COPY.categoryMore, {
+    occasion: occasionLabel(state.occasion),
+    category: categoryLabel(state.category),
+  });
+
+  const sent = await sendProductCarousel(env, to, body, picks);
+
+  if (!sent) {
+    console.log('[browse-category:rejected]', picks.length, `catalog=${env.CATALOG_ID ?? 'unset'}`);
+    await sendButtons(env, to, COPY.looksUnavailable, onward);
+    return;
+  }
+
+  // Recorded so a second Browse Category pages deeper rather than repeating,
+  // and so the abandoned-cart sweep knows what this shopper actually saw.
+  for (const id of picks) {
+    if (!state.shownLookIds.includes(id)) state.shownLookIds.push(id);
+  }
+
+  // Product cards carry a fixed View button and take no extras, so the onward
+  // actions ride in their own message. Browse Category is deliberately absent
+  // — it has just been used, and re-offering it would loop the shopper back
+  // onto the carousel they are looking at.
+  await sendButtons(env, to, COPY.whatNext, onward);
 }
+
 
 /**
  * More than one piece in the bag. Sizes are per garment, so they are worked

@@ -101,7 +101,9 @@ export function Conversations({ chats }: { chats: Conversation[] }) {
                         inbound ? 'bg-muted' : 'bg-accent-lt'
                       }`}
                     >
-                      <div>
+                      {/* Picker cards are written out one per line, so newlines
+                          in the body are meaningful. */}
+                      <div className="whitespace-pre-line">
                         {m.body ?? (
                           <span className="italic text-subtle">
                             {m.payloadId ? `tapped ${m.payloadId}` : `[${m.messageType ?? 'no text'}]`}

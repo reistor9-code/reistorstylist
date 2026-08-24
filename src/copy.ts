@@ -41,8 +41,10 @@ export const COPY = {
     'Those looks are not reachable right now. Try another edit, or talk to our stylist.',
   noMoreLooks: 'That is the full edit for this brief. Browse the category or talk to our stylist.',
   whatNext: 'What next?',
-  catalogUnavailable: 'The catalogue is not opening right now. Start again from the top.',
-  browseCatalog: 'The full Reistor catalogue, open it and browse everything in stock.',
+  // Browse Category shows the rest of the shopper's own edit as a product
+  // carousel. {placeholders} are filled by fill().
+  categoryMore: 'The rest of the {category} edit for {occasion}.',
+  categoryExhausted: 'That is every {category} piece in stock for {occasion} right now.',
   cartReceived: 'Your bag is here. Pick a size and I will open checkout.',
   cartPick: 'Which piece would you like to size first?',
   cartPickNext: '{done} of {total} sized. Which piece next?',

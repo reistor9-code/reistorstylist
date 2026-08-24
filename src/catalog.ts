@@ -16,6 +16,12 @@ export interface SizeStock {
    * before variant ids were carried will not have it.
    */
   variantId?: string;
+  /**
+   * Shopify's SKU for this size. Optional for the same reason as variantId —
+   * items cached before it was carried will not have one, and Shopify itself
+   * allows a blank SKU.
+   */
+  sku?: string;
 }
 
 export interface Product {
@@ -143,7 +149,12 @@ export function mapShopifyProduct(p: ShopifyProduct): Product | null {
   const sizes: SizeStock[] = (p.variants ?? []).flatMap((v) => {
     const size = variantSize(v.title);
     if (!size) return [];
-    return [{ size, stock: v.inventory_quantity, variantId: v.id ? String(v.id) : undefined }];
+    return [{
+      size,
+      stock: v.inventory_quantity,
+      variantId: v.id ? String(v.id) : undefined,
+      sku: v.sku || undefined,
+    }];
   });
   if (!sizes.length) return null;
 
@@ -241,35 +252,35 @@ export const OCCASIONS = [
     label: 'Work & Meetings',
     phrase: 'long meeting days',
     blurb: 'Refined silhouettes that keep comfort in mind.',
-    image: 'https://picsum.photos/seed/occ-work/1080/1080',
+    image: 'https://reistor-dashboard.pages.dev/occasions/top/work.jpg',
   },
   {
     id: 'vacation',
     label: 'Vacation & Travel',
     phrase: 'packing light',
     blurb: 'Stylish, comfortable pieces made for days away and perfect photo ops.',
-    image: 'https://picsum.photos/seed/occ-vacation/1080/1080',
+    image: 'https://reistor-dashboard.pages.dev/occasions/top/vacation.jpg',
   },
   {
     id: 'casual',
     label: 'Weekend & Brunch',
     phrase: 'slow weekend plans',
     blurb: 'Easy styles for relaxed mornings and plans that follow.',
-    image: 'https://picsum.photos/seed/occ-casual/1080/1080',
+    image: 'https://reistor-dashboard.pages.dev/occasions/top/casual.jpg',
   },
   {
     id: 'dinner',
     label: 'Dinner Date',
     phrase: 'evening plans',
     blurb: 'Romantic styles that make you look and feel amazing.',
-    image: 'https://picsum.photos/seed/occ-dinner/1080/1080',
+    image: 'https://reistor-dashboard.pages.dev/occasions/top/dinner.jpg',
   },
   {
     id: 'lounge',
     label: 'Loungewear',
     phrase: 'quiet days at home',
     blurb: 'The comfiest styles to lounge in, step out in, and feel great in all day long.',
-    image: 'https://picsum.photos/seed/occ-lounge/1080/1080',
+    image: 'https://reistor-dashboard.pages.dev/occasions/top/lounge.jpg',
   },
 ] as const;
 
@@ -367,6 +378,31 @@ export const CATEGORIES = [
 export const occasionLabel = (id?: string) => OCCASIONS.find((o) => o.id === id)?.label ?? 'this occasion';
 export const occasionPhrase = (id?: string) => OCCASIONS.find((o) => o.id === id)?.phrase ?? 'the day ahead';
 export const categoryLabel = (id?: string) => CATEGORIES.find((c) => c.id === id)?.label ?? 'this category';
+
+/**
+ * One SKU for a whole product.
+ *
+ * Shopify holds a SKU per variant, so a product has one per size. Where those
+ * share a stem — RST-TOP-0142-XS, -S, -M — the stem is the product's code and
+ * is what a merchandiser recognises. Where they do not, the first size's SKU
+ * is more useful than nothing.
+ */
+export function productSku(p: Product): string | undefined {
+  const skus = p.sizes.map((s) => s.sku).filter((s): s is string => Boolean(s));
+  if (!skus.length) return undefined;
+  if (skus.length === 1) return skus[0];
+
+  let stem = skus[0];
+  for (const sku of skus.slice(1)) {
+    let i = 0;
+    while (i < stem.length && i < sku.length && stem[i] === sku[i]) i++;
+    stem = stem.slice(0, i);
+  }
+  // Trailing separators are an artefact of the comparison, not part of the code.
+  stem = stem.replace(/[-_/\s]+$/, '');
+  return stem.length >= 3 ? stem : skus[0];
+}
+
 
 export const isInStock = (p: Product) => p.sizes.some((s) => s.stock > 0);
 

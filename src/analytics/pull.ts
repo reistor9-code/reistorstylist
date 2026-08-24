@@ -82,6 +82,28 @@ interface ShopifyOrder {
   referring_site: string | null;
   financial_status: string | null;
   line_items?: ShopifyLineItem[];
+  /** Comma-separated. createShopifyOrder() stamps 'whatsapp-bot' on every order. */
+  tags?: string | null;
+}
+
+/** The tag createShopifyOrder() puts on everything it creates. */
+const BOT_TAG = 'whatsapp-bot';
+
+/**
+ * Whether this order came from the bot.
+ *
+ * Two routes, because the bot has had two checkouts. The old one sent the
+ * shopper to reistor.in with utm_source on the URL, which Shopify recorded as
+ * `landing_site`. The Razorpay flow creates the order through the Admin API
+ * instead — nobody browses the store, so there is no landing site at all and
+ * the UTM test rejected every single order. That is why revenue read zero
+ * while the funnel counted sales.
+ */
+function isBotOrder(order: ShopifyOrder): boolean {
+  if (utmOf(order).source === 'whatsapp') return true;
+  return (order.tags ?? '')
+    .split(',')
+    .some((t) => t.trim().toLowerCase() === BOT_TAG);
 }
 
 /** Reads the UTM values the bot wrote, from wherever Shopify recorded them. */
@@ -108,7 +130,7 @@ export async function pullOrders(
   const since = new Date(Date.now() - days * DAY_MS).toISOString();
   const query =
     `orders.json?status=any&limit=250&created_at_min=${encodeURIComponent(since)}` +
-    `&fields=id,name,created_at,total_price,currency,landing_site,referring_site,financial_status,line_items`;
+    `&fields=id,name,created_at,total_price,currency,landing_site,referring_site,financial_status,line_items,tags`;
 
   const res = await deps.shopifyFetch(query);
   if (!res.ok) {
@@ -122,7 +144,7 @@ export async function pullOrders(
 
   // Only WhatsApp-attributed orders. Everything else is somebody else's channel
   // and would inflate the bot's conversion rate if counted.
-  const attributed = all.filter((o) => utmOf(o).source === 'whatsapp');
+  const attributed = all.filter(isBotOrder);
 
   for (const order of attributed) {
     const utm = utmOf(order);
@@ -135,7 +157,10 @@ export async function pullOrders(
         total_inr: Number(order.total_price) || 0,
         currency: order.currency || 'INR',
         landing_site: order.landing_site,
-        utm_source: utm.source ?? null,
+        // Stamped rather than passed through. Every consumer — v_shopper_value,
+        // v_product_conversion, revenue() — filters on utm_source = 'whatsapp',
+        // and an Admin-API order has no landing site to read it from.
+        utm_source: utm.source ?? 'whatsapp',
         utm_medium: utm.medium ?? null,
         financial_status: order.financial_status,
         created_at: order.created_at,

@@ -22,6 +22,7 @@ import { type SupabaseConfig } from '../platform/supabase.js';
 import { defaultRange, loadDashboard, markCalled, type DashboardData } from './queries.js';
 import { loadAnalytics, transcript, type AnalyticsData } from './queries-analytics.js';
 import { renderPage } from './page.js';
+import { humaniseTranscript } from './transcript-text.js';
 
 export interface DashboardEnv {
   SUPABASE_URL?: string;
@@ -38,10 +39,52 @@ function tokenMatches(supplied: string | null, expected: string): boolean {
   return diff === 0;
 }
 
+/**
+ * The shape this file needs from the catalogue, and nothing more.
+ *
+ * Passed in as a function rather than imported so the dashboard keeps no
+ * dependency on Shopify or on the KV binding the catalogue is cached in.
+ */
+export interface CatalogEntry {
+  id: string;
+  title: string;
+  sku?: string;
+}
+
+/**
+ * Puts a name and a SKU on every product id the report mentions.
+ *
+ * The database can only name a product it has already recorded a sale for, so
+ * before the first order every row read "Product 8557998965013". The live
+ * catalogue knows all of them, so it answers first and the stored title stays
+ * as the fallback for anything since deleted from Shopify.
+ */
+function nameProducts(data: DashboardData, catalog: CatalogEntry[]): DashboardData {
+  if (!catalog.length) return data;
+  const byId = new Map(catalog.map((c) => [c.id, c]));
+
+  const named = <T extends { productId: string; title: string | null; sku: string | null }>(row: T): T => {
+    const hit = byId.get(row.productId);
+    if (!hit) return row;
+    return { ...row, title: row.title ?? hit.title, sku: row.sku ?? hit.sku ?? null };
+  };
+
+  return {
+    ...data,
+    topProducts: data.topProducts.map((r) => {
+      const hit = byId.get(r.productId);
+      return hit ? { ...r, title: r.title || hit.title, sku: r.sku ?? hit.sku ?? null } : r;
+    }),
+    productConversion: data.productConversion.map(named),
+    lostDemand: data.lostDemand.map(named),
+  };
+}
+
 export async function handleDashboard(
   request: Request,
   env: DashboardEnv,
   path: string,
+  catalog?: () => Promise<CatalogEntry[]>,
 ): Promise<Response> {
   /*
    * POST is allowed on exactly one path: marking a callback handled. Every
@@ -134,11 +177,19 @@ export async function handleDashboard(
 
   const range = defaultRange(days, phoneNumberId);
 
-  // Both loaders run together; neither depends on the other's numbers.
-  const [data, analytics]: [DashboardData, AnalyticsData] = await Promise.all([
-    loadDashboard(cfg, range),
-    loadAnalytics(cfg, range),
-  ]);
+  /*
+   * All three run together; none depends on another's numbers. The catalogue
+   * is allowed to fail on its own — a Shopify outage should cost the report
+   * its product names, not the whole page.
+   */
+  const [loaded, analytics, products]: [DashboardData, AnalyticsData, CatalogEntry[]] =
+    await Promise.all([
+      loadDashboard(cfg, range),
+      loadAnalytics(cfg, range),
+      catalog ? catalog().catch(() => [] as CatalogEntry[]) : Promise.resolve([] as CatalogEntry[]),
+    ]);
+
+  const data = nameProducts(loaded, products);
 
   /*
    * One shopper's messages, fetched on demand rather than shipped with the
@@ -153,7 +204,16 @@ export async function handleDashboard(
         headers: { 'content-type': 'application/json' },
       });
     }
-    return new Response(JSON.stringify(await transcript(cfg, waId), null, 2), {
+    /*
+     * Product names come from the live catalogue for the same reason they do
+     * on the product tables: the database can only name a product it has
+     * recorded a sale for, and a transcript reading "tapped look:9296863461653"
+     * tells whoever is reading it nothing at all.
+     */
+    const names = new Map(products.map((p) => [p.id, p.title]));
+    const rows = humaniseTranscript(await transcript(cfg, waId), names);
+
+    return new Response(JSON.stringify(rows, null, 2), {
       status: 200,
       headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
     });

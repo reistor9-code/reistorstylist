@@ -32,6 +32,7 @@ export interface Callback {
 export interface TopProduct {
   productId: string;
   title: string;
+  sku: string | null;
   unitsSold: number;
   revenueINR: number;
   orders: number;
@@ -41,6 +42,7 @@ export interface TopProduct {
 export interface ProductConversion {
   productId: string;
   title: string | null;
+  sku: string | null;
   timesShown: number;
   timesSized: number;
   unitsSold: number;
@@ -50,6 +52,7 @@ export interface ProductConversion {
 export interface LostDemand {
   productId: string;
   title: string | null;
+  sku: string | null;
   size: string | null;
   times: number;
   lastAt: string | null;

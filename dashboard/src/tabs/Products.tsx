@@ -4,7 +4,21 @@ import { Bar, Empty } from '@/components/ui/stat';
 import { inr, num, pct } from '@/lib/utils';
 import type { AnalyticsData, DashboardData } from '@/lib/api';
 
+/**
+ * What a row is called.
+ *
+ * Title first, SKU second, the raw Shopify id only when the catalogue has
+ * never heard of the product. A bare id is unreadable to whoever is deciding
+ * what to reorder.
+ */
 const name = (p: { title: string | null; productId: string }) => p.title || `Product ${p.productId}`;
+
+const Ident = ({ p }: { p: { title: string | null; sku: string | null; productId: string } }) => (
+  <span className="flex min-w-0 items-baseline gap-2">
+    <span className="min-w-0 truncate">{name(p)}</span>
+    {p.sku ? <span className="tabular shrink-0 text-xs text-subtle">{p.sku}</span> : null}
+  </span>
+);
 
 /**
  * What sells, what does not, and what you could not sell because it was gone.
@@ -44,7 +58,7 @@ export function Products({
               <ul className="divide-y divide-border text-sm">
                 {topProducts.map((p) => (
                   <li key={p.productId} className="flex items-center justify-between gap-4 py-3">
-                    <span className="min-w-0 truncate">{p.title}</span>
+                    <Ident p={p} />
                     <span className="flex shrink-0 items-center gap-3">
                       <Badge>{num(p.unitsSold)} sold</Badge>
                       <span className="tabular font-medium">{inr(p.revenueINR)}</span>
@@ -69,7 +83,7 @@ export function Products({
                 {worst.map((p) => (
                   <li key={p.productId} className="py-3">
                     <div className="flex items-center justify-between gap-4">
-                      <span className="min-w-0 truncate">{name(p)}</span>
+                      <Ident p={p} />
                       <span className="tabular shrink-0 text-subtle">
                         {pct(p.conversionPct)}
                       </span>
@@ -135,7 +149,7 @@ export function Products({
 /** Lost demand without a stock snapshot behind it, so `stillGone` is unknown. */
 const toGap = (l: DashboardData['lostDemand'][number]): AnalyticsData['stockGaps'][number] => ({
   productId: l.productId,
-  title: l.title,
+  title: l.sku ? `${l.title ?? `Product ${l.productId}`} · ${l.sku}` : l.title,
   size: l.size,
   turnedAway: l.times,
   stockNow: 0,
