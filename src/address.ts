@@ -31,14 +31,19 @@ const savedKey = (waId: string) => `addr:${waId}`;
 /**
  * The India field set, exactly as Meta names it.
  *
- * `in_post_code` is the PIN code — Meta validates it and can return a
+ * `in_pin_code` is the PIN code — Meta validates it and can return a
  * validation_errors object naming the field that failed, which is why the
  * names have to match rather than being tidied into our own shape.
  */
 export interface ShippingAddress {
   name?: string;
   phone_number?: string;
-  in_post_code?: string;
+  /**
+   * The PIN code. Meta's own field is `in_pin_code` — third-party guides say
+   * `in_post_code`, which is wrong and cost us a loop: the value never landed,
+   * so the address read as incomplete and the form was sent again.
+   */
+  in_pin_code?: string;
   house_number?: string;
   floor_number?: string;
   tower_number?: string;
@@ -51,7 +56,7 @@ export interface ShippingAddress {
 
 /** Enough to ship to. Meta can return a partial form. */
 export function isComplete(a: ShippingAddress | null | undefined): a is ShippingAddress {
-  return Boolean(a?.address && a.city && a.in_post_code);
+  return Boolean(a?.address && a.city && a.in_pin_code);
 }
 
 export async function loadAddress(env: Env, waId: string): Promise<ShippingAddress | null> {
@@ -164,7 +169,9 @@ export function parseAddressReply(message: Record<string, any>): ShippingAddress
   const address: ShippingAddress = {
     name: str(v.name),
     phone_number: str(v.phone_number),
-    in_post_code: str(v.in_post_code ?? v.postal_code ?? v.pin_code),
+    in_pin_code: str(
+      v.in_pin_code ?? v.in_post_code ?? v.postal_code ?? v.pin_code ?? v.pincode ?? v.zip,
+    ),
     house_number: str(v.house_number),
     floor_number: str(v.floor_number),
     tower_number: str(v.tower_number),
@@ -206,7 +213,7 @@ export function toShopifyAddress(a: ShippingAddress, fallbackPhone: string): Rec
     ...(line2 ? { address2: line2 } : {}),
     city: a.city,
     ...(a.state ? { provinceCode: undefined, province: a.state } : {}),
-    zip: a.in_post_code,
+    zip: a.in_pin_code,
     countryCode: 'IN',
     phone: a.phone_number || fallbackPhone,
   };
@@ -218,7 +225,7 @@ export function summarise(a: ShippingAddress): string {
     a.name,
     [a.house_number, a.address].filter(Boolean).join(', '),
     [a.building_name, a.landmark_area].filter(Boolean).join(', '),
-    [a.city, a.state, a.in_post_code].filter(Boolean).join(' '),
+    [a.city, a.state, a.in_pin_code].filter(Boolean).join(' '),
   ]
     .filter(Boolean)
     .join('\n');

@@ -375,7 +375,7 @@ async function handleAddress(
   address: ShippingAddress,
 ): Promise<void> {
   await saveAddress(env, to, address);
-  console.log('[address:saved]', to, address.city ?? '', address.in_post_code ?? '');
+  console.log('[address:saved]', to, address.city ?? '', address.in_pin_code ?? '');
 
   await sendText(env, to, `${COPY.addressSaved}
 ${summarise(address)}`);
@@ -393,7 +393,17 @@ async function resumeCheckout(env: Env, to: string, state: State): Promise<void>
   }
 
   await env.STATE.delete(`colines:${to}`);
-  await openCheckout(env, to, state, await getProducts(env), lines);
+
+  /*
+   * `askedAlready` so the form is sent once and once only.
+   *
+   * The shopper has just filled it in. If anything about what came back reads
+   * as incomplete — a field named differently than expected, a form submitted
+   * half-empty — asking again produces exactly the same result and traps them
+   * in a loop. Better to carry on and let the order be tagged address-pending,
+   * which is a person's afternoon rather than a dead conversation.
+   */
+  await openCheckout(env, to, state, await getProducts(env), lines, true);
 }
 
 async function openCheckout(
@@ -402,6 +412,7 @@ async function openCheckout(
   state: State,
   all: Product[],
   lines: { productId: string; title: string; size: string; priceINR: number }[],
+  askedAlready = false,
 ): Promise<void> {
   /*
    * The address, before the money.
@@ -414,7 +425,7 @@ async function openCheckout(
    * A shopper who has ordered before is not asked again — their address is on
    * file and offered inside the form as a pickable option when they are.
    */
-  if ((env.ADDRESS_CAPTURE || 'on').toLowerCase() === 'on') {
+  if (!askedAlready && (env.ADDRESS_CAPTURE || 'on').toLowerCase() === 'on') {
     const known = await loadAddress(env, to);
     if (!isComplete(known)) {
       // Stashed so the reply can resume exactly this basket.
