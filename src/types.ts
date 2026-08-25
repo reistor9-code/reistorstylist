@@ -12,6 +12,18 @@ export interface Env {
   WHATSAPP_TOKEN: string;
   PHONE_NUMBER_ID: string;
   VERIFY_TOKEN: string;
+  /**
+   * Meta app secret. Every inbound webhook is signed with it, and without
+   * it the endpoint accepts anything anyone posts. See src/signature.ts.
+   */
+  APP_SECRET?: string;
+  /**
+   * Gates /admin/*. Separate from VERIFY_TOKEN because Meta holds that one
+   * — anyone who can read the app's webhook config could otherwise run
+   * catalog syncs and send test messages. Falls back to VERIFY_TOKEN when
+   * unset, so nothing breaks before it is set.
+   */
+  ADMIN_TOKEN?: string;
   /* Razorpay — test-mode payment links. See src/razorpay.ts. */
   RAZORPAY_KEY_ID?: string;
   RAZORPAY_KEY_SECRET?: string;

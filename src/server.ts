@@ -16,6 +16,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import worker from './index';
 import type { Env } from './types';
 import { connectRedis } from './platform/kv-redis';
+import { configFromProcess, configWarnings, missingRequired } from './platform/config';
 
 const PORT = Number(process.env.PORT ?? 8080);
 const HOST = process.env.HOST ?? '127.0.0.1';
@@ -82,6 +83,19 @@ async function writeResponse(res: ServerResponse, response: Response): Promise<v
 }
 
 async function main(): Promise<void> {
+  /*
+   * Checked at boot, so a missing secret is one line in the journal rather
+   * than a shopper who gets no reply. This module existed and was never
+   * called — which is why "APP_SECRET is unset, webhook signatures are NOT
+   * verified" went unread for weeks while the endpoint accepted anything.
+   */
+  const config = configFromProcess(process.env as Record<string, string | undefined>);
+  const missing = missingRequired(config);
+  if (missing.length) {
+    console.log('[config:MISSING]', missing.join(', '), '— the bot cannot answer a message');
+  }
+  for (const warning of configWarnings(config)) console.log('[config:warning]', warning);
+
   const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
   const { kv } = await connectRedis(redisUrl);
   const env = readEnv(kv as unknown as Env['STATE']);

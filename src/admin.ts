@@ -439,6 +439,25 @@ export async function createCarouselTemplates(env: Env, waba: string, appId: str
  * Returns null when the path is not an admin route, so the caller falls
  * through to the webhook.
  */
+import { timingSafeEqual } from './signature';
+
+/**
+ * The gate on every /admin route.
+ *
+ * ADMIN_TOKEN rather than VERIFY_TOKEN, because Meta holds VERIFY_TOKEN —
+ * anyone able to read the app's webhook configuration could otherwise re-sync
+ * the catalog, move it between accounts, or send messages as the brand.
+ * Falls back to VERIFY_TOKEN so an install without ADMIN_TOKEN keeps working.
+ *
+ * Compared in constant time: a plain !== leaks how much of a guess was right
+ * through how long the answer takes.
+ */
+function adminOk(env: Env, url: URL): boolean {
+  const expected = env.ADMIN_TOKEN?.trim() || env.VERIFY_TOKEN;
+  const supplied = url.searchParams.get('token');
+  return Boolean(expected && supplied && timingSafeEqual(supplied, expected));
+}
+
 export async function handleAdmin(
   request: Request,
   env: Env,
@@ -457,7 +476,7 @@ export async function handleAdmin(
      * once the subscription is in place.
      */
     if (path === '/admin/subscribe' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const waba = url.searchParams.get('waba');
@@ -501,7 +520,7 @@ export async function handleAdmin(
      * than creating anything. Delete this route once the templates exist.
      */
     if (path === '/admin/templates' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const waba = url.searchParams.get('waba');
@@ -561,7 +580,7 @@ export async function handleAdmin(
      *   /admin/sets?token=<VERIFY_TOKEN>[&catalog=<CATALOG_ID>]
      */
     if (path === '/admin/sets' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const catalogId = url.searchParams.get('catalog') ?? env.CATALOG_ID;
@@ -602,7 +621,7 @@ export async function handleAdmin(
     }
 
     if (path === '/admin/commerce' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
 
@@ -659,7 +678,7 @@ export async function handleAdmin(
      *   /admin/sync?token=<VERIFY_TOKEN>[&limit=400][&offset=0][&prune=1]
      */
     if (path === '/admin/sync' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const catalogId = url.searchParams.get('catalog') ?? env.CATALOG_ID;
@@ -700,7 +719,7 @@ export async function handleAdmin(
     }
 
     if (path === '/admin/relink' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const target = url.searchParams.get('to');
@@ -732,7 +751,7 @@ export async function handleAdmin(
     }
 
     if (path === '/admin/catalog' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const business = url.searchParams.get('business');
@@ -769,7 +788,7 @@ export async function handleAdmin(
      *   /admin/testproduct?token=<VERIFY_TOKEN>&to=<WA_ID>&ids=<id1,id2>
      */
     if (path === '/admin/testproduct' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const to = url.searchParams.get('to');
@@ -799,7 +818,7 @@ export async function handleAdmin(
      *   /admin/retemplate?token=<VERIFY_TOKEN>&waba=<WABA_ID>&app=<APP_ID>
      */
     if (path === '/admin/retemplate' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const waba = url.searchParams.get('waba');
@@ -832,7 +851,7 @@ export async function handleAdmin(
      *   /admin/mapped?token=<VERIFY_TOKEN>[&fresh=1]
      */
     if (path === '/admin/mapped' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       if (url.searchParams.get('fresh') === '1') await env.STATE.delete(SHOPIFY_CACHE_KEY);
@@ -873,7 +892,7 @@ export async function handleAdmin(
      *   /admin/shopify?token=<VERIFY_TOKEN>[&limit=5][&version=2026-01]
      */
     if (path === '/admin/shopify' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const result = await sampleShopify(env, Number(url.searchParams.get('limit') ?? 5));
@@ -889,7 +908,7 @@ export async function handleAdmin(
      *   /admin/catalogs?token=<VERIFY_TOKEN>&business=<BUSINESS_ID>
      */
     if (path === '/admin/catalogs' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
       const business = url.searchParams.get('business');
@@ -917,7 +936,7 @@ export async function handleAdmin(
      * &full=1 to stop long values being truncated.
      */
     if (path === '/admin/metafields' && request.method === 'GET') {
-      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+      if (!adminOk(env, url)) {
         return new Response('Forbidden', { status: 403 });
       }
 

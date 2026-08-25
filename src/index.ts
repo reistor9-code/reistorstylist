@@ -73,6 +73,7 @@ import {
   type PaymentUpdate,
 } from './inapp';
 import { sendButtons, sendText } from './whatsapp';
+import { timingSafeEqual, verifyMetaSignature } from './signature';
 
 /* ------------------------------------------------------------------ *
  * Router
@@ -1159,9 +1160,10 @@ export default {
       const mode = url.searchParams.get('hub.mode');
       const token = url.searchParams.get('hub.verify_token');
       const challenge = url.searchParams.get('hub.challenge');
-      console.log('[verify]', mode, token === env.VERIFY_TOKEN ? 'token-ok' : 'token-mismatch');
+      const matches = Boolean(token && env.VERIFY_TOKEN && timingSafeEqual(token, env.VERIFY_TOKEN));
+      console.log('[verify]', mode, matches ? 'token-ok' : 'token-mismatch');
 
-      if (mode === 'subscribe' && token === env.VERIFY_TOKEN && challenge) {
+      if (mode === 'subscribe' && matches && challenge) {
         return new Response(challenge, { status: 200 });
       }
       return new Response('Forbidden', { status: 403 });
@@ -1171,9 +1173,32 @@ export default {
       return new Response('Method not allowed', { status: 405 });
     }
 
+    /*
+     * The raw bytes, read once and used for both the signature and the parse.
+     *
+     * Meta signs exactly what it sent. Parsing first and re-serialising to
+     * check would change the whitespace and reject a genuine message.
+     */
+    const raw = await request.text();
+    const verdict = await verifyMetaSignature(env, request, raw);
+
+    if (verdict === 'bad' || verdict === 'missing') {
+      console.log('[inbound:refused]', verdict);
+      return new Response('Forbidden', { status: 403 });
+    }
+    if (verdict === 'unconfigured') {
+      /*
+       * Logged on every request rather than once at boot. A webhook nobody is
+       * checking must not become quiet background noise — anyone who learns
+       * this URL can drive the entire flow, spend the messaging balance and
+       * place orders. Set APP_SECRET.
+       */
+      console.log('[inbound:UNVERIFIED] APP_SECRET is unset — anyone can forge this request');
+    }
+
     let body: unknown;
     try {
-      body = await request.json();
+      body = JSON.parse(raw);
     } catch {
       console.log('[inbound:bad-json]');
       return new Response('EVENT_RECEIVED', { status: 200 });
