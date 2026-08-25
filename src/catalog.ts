@@ -235,7 +235,15 @@ export async function getProducts(env: Env): Promise<Product[]> {
 }
 
 /** Where the picker artwork is served from — see dashboard/public/. */
-const CATEGORY_IMAGE_BASE = 'https://reistor-dashboard.pages.dev/categories';
+/**
+ * Where the picker artwork is served from.
+ *
+ * A path, not a URL. The host comes from ASSET_BASE at send time so moving the
+ * images off Cloudflare Pages onto the Linode's own Nginx is one environment
+ * variable rather than six edits and a redeploy — which matters when the
+ * cutover has to be reversible in a hurry.
+ */
+const CATEGORY_IMAGE_PATH = '/categories';
 
 export const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', '5XL'];
 
@@ -255,35 +263,35 @@ export const OCCASIONS = [
     label: 'Work & Meetings',
     phrase: 'long meeting days',
     blurb: 'Refined silhouettes that keep comfort in mind.',
-    image: 'https://reistor-dashboard.pages.dev/occasions/top/work.jpg',
+    image: '/occasions/top/work.jpg',
   },
   {
     id: 'vacation',
     label: 'Vacation & Travel',
     phrase: 'packing light',
     blurb: 'Stylish, comfortable pieces made for days away and perfect photo ops.',
-    image: 'https://reistor-dashboard.pages.dev/occasions/top/vacation.jpg',
+    image: '/occasions/top/vacation.jpg',
   },
   {
     id: 'casual',
     label: 'Weekend & Brunch',
     phrase: 'slow weekend plans',
     blurb: 'Easy styles for relaxed mornings and plans that follow.',
-    image: 'https://reistor-dashboard.pages.dev/occasions/top/casual.jpg',
+    image: '/occasions/top/casual.jpg',
   },
   {
     id: 'dinner',
     label: 'Dinner Date',
     phrase: 'evening plans',
     blurb: 'Romantic styles that make you look and feel amazing.',
-    image: 'https://reistor-dashboard.pages.dev/occasions/top/dinner.jpg',
+    image: '/occasions/top/dinner.jpg',
   },
   {
     id: 'lounge',
     label: 'Loungewear',
     phrase: 'quiet days at home',
     blurb: 'The comfiest styles to lounge in, step out in, and feel great in all day long.',
-    image: 'https://reistor-dashboard.pages.dev/occasions/top/lounge.jpg',
+    image: '/occasions/top/lounge.jpg',
   },
 ] as const;
 
@@ -426,10 +434,27 @@ export function categoryImage(
 ): string {
   const enabled = (env.CATEGORY_ARTWORK_ENABLED || 'off').toLowerCase() === 'on';
   if (enabled && occasion && CATEGORY_ARTWORK[occasion]?.includes(categoryId)) {
-    return `${CATEGORY_IMAGE_BASE}/${occasion}/${categoryId}.jpg`;
+    return assetUrl(env, `${CATEGORY_IMAGE_PATH}/${occasion}/${categoryId}.jpg`);
   }
   return CATEGORIES.find((c) => c.id === categoryId)?.image ?? '';
 }
+
+
+/**
+ * Absolute URL for an asset the bot serves itself.
+ *
+ * Meta fetches card images over the public internet, so a path is not enough.
+ * Anything already absolute is returned untouched — Shopify CDN images arrive
+ * that way and must not be rewritten.
+ */
+export function assetUrl(env: Env, path: string): string {
+  if (/^https?:\/\//i.test(path)) return path;
+  const base = (env.ASSET_BASE || 'https://reistor-dashboard.pages.dev').replace(/\/+$/, '');
+  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+}
+
+/** The occasion card's artwork, resolved against ASSET_BASE. */
+export const occasionImage = (env: Env, o: { image: string }) => assetUrl(env, o.image);
 
 
 export const occasionLabel = (id?: string) => OCCASIONS.find((o) => o.id === id)?.label ?? 'this occasion';
@@ -630,6 +655,24 @@ export function parseVariantRetailerId(
 }
 
 /**
+ * The catalog id for one size, when the product id itself joins the group.
+ *
+ * A Meta variant group has no parent item — it is just a set of items sharing
+ * an item_group_id. That left us with an id we could send (the product-level
+ * item, in no group) and ids in a group we could not send, so neither path
+ * rendered a size selector.
+ *
+ * So the first in-stock size claims the product id, and the rest keep the
+ * suffixed form. The id the carousel already sends is then a member of its own
+ * group, which is what Meta needs to draw the selector.
+ */
+export function groupedRetailerId(p: Product, size: string): string {
+  const primary = (p.sizes.find((s) => s.stock > 0) ?? p.sizes[0])?.size;
+  return size === primary ? p.id : variantRetailerId(p.id, size);
+}
+
+
+/**
  * The variant a product message should point at.
  *
  * A carousel card takes one retailer_id, but the shopper should land on the
@@ -676,9 +719,16 @@ export async function syncCatalogItems(
   env: Env,
   catalogId: string,
   products: Product[],
-  opts: { limit?: number; offset?: number; prune?: boolean; only?: string } = {},
+  opts: {
+    limit?: number;
+    offset?: number;
+    prune?: boolean;
+    only?: string;
+    /** Let the product id claim the first in-stock size. See groupedRetailerId. */
+    groupPrimary?: boolean;
+  } = {},
 ): Promise<Record<string, unknown>> {
-  const { limit, offset = 0, prune = true, only } = opts;
+  const { limit, offset = 0, prune = true, only, groupPrimary = false } = opts;
   if (only) products = products.filter((p) => p.id === only);
 
   const existing = await existingRetailerIds(env, catalogId);
@@ -687,7 +737,11 @@ export async function syncCatalogItems(
   const all = products.flatMap((p) =>
     p.sizes.map((s) => ({ product: p, size: s })),
   );
-  const live = new Set(all.map(({ product, size }) => variantRetailerId(product.id, size.size)));
+  const live = new Set(
+    all.map(({ product, size }) =>
+      groupPrimary ? groupedRetailerId(product, size.size) : variantRetailerId(product.id, size.size),
+    ),
+  );
 
   const slice = limit ? all.slice(offset, offset + limit) : all;
 
@@ -704,7 +758,7 @@ export async function syncCatalogItems(
    * that is a string carrying its own currency.
    */
   const upserts = slice.map(({ product: p, size }) => {
-    const id = variantRetailerId(p.id, size.size);
+    const id = groupPrimary ? groupedRetailerId(p, size.size) : variantRetailerId(p.id, size.size);
     return {
       method: existing.has(id) ? 'UPDATE' : 'CREATE',
       data: {

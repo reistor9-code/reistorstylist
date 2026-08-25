@@ -85,6 +85,12 @@ export interface Env {
    * its size selector. Off (default) uses the product-level id, which is
    * what Meta currently accepts. See primaryRetailerId().
    */
+  /**
+   * Host serving the picker artwork — the occasion and category cards.
+   * Defaults to the Cloudflare Pages site; set it to the Linode's own
+   * host to cut Pages out. See assetUrl().
+   */
+  ASSET_BASE?: string;
   CATALOG_VARIANTS?: string;
   CATEGORY_ARTWORK_ENABLED?: string;
   /**

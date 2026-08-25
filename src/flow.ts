@@ -12,6 +12,7 @@ import {
   filterProducts,
   getProducts,
   inStockSizes,
+  occasionImage,
   occasionLabel,
   occasionPhrase,
   primaryRetailerId,
@@ -128,7 +129,7 @@ export async function askOccasion(env: Env, to: string, state: State): Promise<v
     to,
     env.OCCASION_TEMPLATE || 'occasion_picker',
     OCCASIONS.map((o) => ({
-      imageUrl: o.image,
+      imageUrl: occasionImage(env, o),
       // Card bodies are static — see carouselTemplate() for why.
       bodyParams: [],
       payload: `occ:${o.id}`,

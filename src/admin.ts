@@ -681,6 +681,9 @@ export async function handleAdmin(
           offset: only ? 0 : offset,
           prune,
           only,
+          // ?group=1 lets the product id claim its first in-stock size, so the
+          // id the carousel sends is a member of its own variant group.
+          groupPrimary: url.searchParams.get('group') === '1',
         });
         console.log('[admin:sync]', JSON.stringify({ ...result, batches: undefined }));
         return new Response(JSON.stringify(result, null, 2), {
