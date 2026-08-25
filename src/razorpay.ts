@@ -222,14 +222,21 @@ export async function sendRazorpayCheckout(
   if (state.sessionId) await markCheckoutOpened(env, state.sessionId, lines[0]?.size);
 
   /*
-   * Every line is itemised, with a total only when there is more than one.
+   * Every line is itemised, with a total whenever the total is not simply the
+   * line above it — more than one garment, or a discount applied.
+   *
    * A basket total with no breakdown is the point at which a shopper stops
-   * trusting the figure and closes the chat.
+   * trusting the figure and closes the chat. So is a message saying ₹3,000
+   * beside a payment page asking for ₹2,700.
    */
   const itemised = lines
     .map((l) => `${l.title}\nSize ${l.size} · ${formatINR(l.priceINR)}`)
     .join('\n\n');
-  const totalLine = lines.length > 1 ? `\n\nTotal ${formatINR(total)}` : '';
+
+  const summary: string[] = [];
+  if (coupon) summary.push(`${coupon.code}  −${formatINR(coupon.discountINR)}`);
+  if (coupon || lines.length > 1) summary.push(`Total ${formatINR(total)}`);
+  const totalLine = summary.length ? `\n\n${summary.join('\n')}` : '';
 
   await sendCtaUrl(
     env,
