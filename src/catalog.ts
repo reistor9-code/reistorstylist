@@ -801,11 +801,26 @@ export async function syncCatalogItems(
   });
 
   /*
-   * Pruning is skipped on a partial sync. `existing` holds every id in the
-   * catalog, so a slice would see the sizes it is not carrying as stale and
-   * delete the rest of the catalog.
+   * Pruning has to be scoped to whatever this call actually covers.
+   *
+   * `existing` holds every id in the catalog while `live` holds only the ids
+   * this call built. On a slice, or on a single product, the difference is
+   * almost the whole catalog — and deleting it is exactly what happened once:
+   * `only=<product>&prune=1` removed 1,974 items because the guard checked
+   * `limit` and `only` sets no limit.
+   *
+   * So: a single-product call prunes only that product's own ids, a slice
+   * prunes nothing, and a full pass prunes everything no longer live.
    */
-  const stale = prune && !limit ? [...existing].filter((id) => !live.has(id)) : [];
+  const stale = !prune
+    ? []
+    : only
+      ? [...existing].filter(
+          (id) => (id === only || id.startsWith(`${only}-`)) && !live.has(id),
+        )
+      : limit
+        ? []
+        : [...existing].filter((id) => !live.has(id));
 
   const requests = [
     ...upserts,
