@@ -404,7 +404,7 @@ async function resumeCheckout(env: Env, to: string, state: State): Promise<void>
    * in a loop. Better to carry on and let the order be tagged address-pending,
    * which is a person's afternoon rather than a dead conversation.
    */
-  await openCheckout(env, to, state, await getProducts(env), lines, true);
+  await openCheckout(env, to, state, await getProducts(env), lines, { address: true });
 }
 
 async function openCheckout(
@@ -413,7 +413,14 @@ async function openCheckout(
   state: State,
   all: Product[],
   lines: { productId: string; title: string; size: string; priceINR: number }[],
-  askedAlready = false,
+  /*
+   * What has already been settled for this basket.
+   *
+   * One flag used to cover both, which meant a shopper who filled in an
+   * address was never offered a discount — the same boolean that said "stop
+   * asking about delivery" also said "stop asking about codes".
+   */
+  done: { address?: boolean; coupon?: boolean } = {},
 ): Promise<void> {
   /*
    * The address, before the money.
@@ -426,15 +433,29 @@ async function openCheckout(
    * A shopper who has ordered before is not asked again — their address is on
    * file and offered inside the form as a pickable option when they are.
    */
-  if (!askedAlready && (env.ADDRESS_CAPTURE || 'on').toLowerCase() === 'on') {
+  if (!done.address && (env.ADDRESS_CAPTURE || 'on').toLowerCase() === 'on') {
     const known = await loadAddress(env, to);
-    if (!isComplete(known)) {
-      // Stashed so the reply can resume exactly this basket.
-      await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
-      if (await askAddress(env, to, state, COPY.addressAsk)) return;
-      // address_message unavailable — carry on rather than strand the shopper.
-      console.log('[address:skipped] falling through to checkout');
+    // Stashed either way, so whichever button comes back resumes this basket.
+    await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
+
+    /*
+     * A returning shopper confirms rather than retypes — but is shown what
+     * they are confirming. Silently shipping to an address from six months ago
+     * is the kind of thing nobody notices until a parcel goes to an old flat.
+     */
+    if (isComplete(known)) {
+      state.step = 'address';
+      await sendButtons(env, to, `${COPY.addressConfirm}
+${summarise(known)}`, [
+        { id: 'act:addr_ok', title: 'Deliver here' },
+        { id: 'act:addr_new', title: 'Use another' },
+      ]);
+      return;
     }
+
+    if (await askAddress(env, to, state, COPY.addressAsk)) return;
+    // address_message unavailable — carry on rather than strand the shopper.
+    console.log('[address:skipped] falling through to checkout');
   }
 
   /*
@@ -444,7 +465,7 @@ async function openCheckout(
    * code with a minimum spend can be judged against a total that will not
    * change, so "that code needs ₹3,000 or more" is true when it is said.
    */
-  if (!askedAlready && (env.COUPONS || 'on').toLowerCase() === 'on') {
+  if (!done.coupon && (env.COUPONS || 'on').toLowerCase() === 'on') {
     const already = await loadApplied(env, to);
     if (!already) {
       await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
@@ -623,6 +644,20 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
     case 'act:browse':
       await browseCategory(env, to, state, all);
       return;
+    case 'act:addr_ok':
+      // Confirmed. The coupon step still owes them a question.
+      await resumeCheckout(env, to, state);
+      return;
+    case 'act:addr_new': {
+      /*
+       * The form opens with the saved address offered as a pickable option, so
+       * "use another" is a change of mind rather than a blank page — and
+       * picking the old one again is still one tap.
+       */
+      if (await askAddress(env, to, state, COPY.addressAsk)) return;
+      await resumeCheckout(env, to, state);
+      return;
+    }
     case 'act:coupon':
       state.step = 'coupon';
       await sendText(env, to, COPY.couponPrompt);
@@ -633,7 +668,7 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
       const raw = await env.STATE.get(`colines:${to}`);
       const lines = raw ? JSON.parse(raw) : [];
       await env.STATE.delete(`colines:${to}`);
-      if (lines.length) await openCheckout(env, to, state, all, lines, true);
+      if (lines.length) await openCheckout(env, to, state, all, lines, { address: true, coupon: true });
       else await sendText(env, to, COPY.addressSavedNoBag);
       return;
     }
@@ -779,7 +814,7 @@ async function handleText(env: Env, to: string, state: State, text: string): Pro
     );
 
     await env.STATE.delete(`colines:${to}`);
-    if (lines.length) await openCheckout(env, to, state, await getProducts(env), lines, true);
+    if (lines.length) await openCheckout(env, to, state, await getProducts(env), lines, { address: true, coupon: true });
     else await sendText(env, to, COPY.addressSavedNoBag);
     return;
   }

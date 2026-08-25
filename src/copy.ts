@@ -58,6 +58,7 @@ export const COPY = {
   addressAsk: 'Where should this go? Fill in the delivery address and I will open checkout.',
   addressSaved: 'Saved. Delivering to:',
   addressSavedNoBag: 'Address saved. Tap a look to start a new bag.',
+  addressConfirm: 'Delivering to:',
   couponAsk: 'Have a discount code?',
   couponPrompt: 'Type the code and I will check it.',
   couponApplied: '{code} applied. {was} → {now}',
