@@ -119,6 +119,11 @@ export interface Env {
    * every code is refused. See src/coupons.ts.
    */
   COUPONS?: string;
+  /**
+   * "on" (default) offers cash on delivery beside online payment. A COD
+   * order is created PENDING with no transaction — see src/cod.ts.
+   */
+  COD?: string;
   PICKER_MODE?: string;
   OCCASION_TEMPLATE?: string;
   CATEGORY_TEMPLATE?: string;

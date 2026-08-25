@@ -55,6 +55,7 @@ import { runJobs } from './jobs';
 import { handleRazorpayWebhook, razorpayStatus, sendRazorpayCheckout } from './razorpay';
 import { handleFastrrWebhook } from './fastrr';
 import { clearApplied, loadApplied, refusal, saveApplied, validateCoupon } from './coupons';
+import { placeCodOrder, sendCodConfirm } from './cod';
 import {
   askAddress,
   isComplete,
@@ -420,7 +421,7 @@ async function openCheckout(
    * address was never offered a discount — the same boolean that said "stop
    * asking about delivery" also said "stop asking about codes".
    */
-  done: { address?: boolean; coupon?: boolean } = {},
+  done: { address?: boolean; coupon?: boolean; payment?: boolean } = {},
 ): Promise<void> {
   /*
    * The address, before the money.
@@ -508,6 +509,23 @@ ${summarise(known)}`, [
     await sendButtons(env, to, COPY.couponAsk, [
       { id: 'act:coupon', title: 'Apply a code' },
       { id: 'act:nocoupon', title: 'No, continue' },
+    ]);
+    return;
+  }
+
+  /*
+   * How they want to pay, once the bag and the price are settled.
+   *
+   * Cash on delivery is most of Indian fashion ecommerce, so it is offered
+   * beside the card rather than buried. The two paths diverge completely from
+   * here: online creates a payment link and waits for a webhook, COD places
+   * the order on a button press and collects nothing.
+   */
+  if (!done.payment && (env.COD || 'on').toLowerCase() === 'on') {
+    await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
+    await sendButtons(env, to, COPY.payHow, [
+      { id: 'act:pay_online', title: 'Pay online' },
+      { id: 'act:pay_cod', title: 'Cash on delivery' },
     ]);
     return;
   }
@@ -677,6 +695,30 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
     case 'act:catalog':
     case 'act:browse':
       await browseCategory(env, to, state, all);
+      return;
+    case 'act:pay_online': {
+      const raw = await env.STATE.get(`colines:${to}`);
+      const lines = raw ? JSON.parse(raw) : [];
+      await env.STATE.delete(`colines:${to}`);
+      if (lines.length) {
+        await openCheckout(env, to, state, all, lines, {
+          address: true,
+          coupon: true,
+          payment: true,
+        });
+      } else await sendText(env, to, COPY.addressSavedNoBag);
+      return;
+    }
+    case 'act:pay_cod': {
+      const raw = await env.STATE.get(`colines:${to}`);
+      const lines = raw ? JSON.parse(raw) : [];
+      await env.STATE.delete(`colines:${to}`);
+      if (lines.length) await sendCodConfirm(env, to, state, lines);
+      else await sendText(env, to, COPY.addressSavedNoBag);
+      return;
+    }
+    case 'act:cod_confirm':
+      await placeCodOrder(env, to, state);
       return;
     case 'act:addr_ok':
       // Confirmed. The coupon step still owes them a question.

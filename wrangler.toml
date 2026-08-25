@@ -64,6 +64,11 @@ CATEGORY_ARTWORK_ENABLED = "off"
 # actually sent.
 CATALOG_VARIANTS = "off"
 
+# Offer cash on delivery beside online payment. A COD order is created in
+# Shopify as PENDING with no transaction — the courier collects at the door,
+# so marking it paid would corrupt the day's takings. See src/cod.ts.
+COD = "on"
+
 # Offer a discount code before checkout, validated against Shopify so the
 # amount charged and the amount on the order agree. Needs read_discounts on
 # the Shopify app. See src/coupons.ts.

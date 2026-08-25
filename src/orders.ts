@@ -169,6 +169,14 @@ export interface OrderPushInput {
   shipping?: ShippingAddress;
   /** Validated against Shopify, so the order and the gateway agree. */
   coupon?: Coupon;
+  /**
+   * Cash on delivery — no money has moved.
+   *
+   * The order must not read as paid: the courier collects at the door, and an
+   * order marked PAID with nothing behind it corrupts the day's takings and
+   * tells the packer a debt has been settled that has not.
+   */
+  cod?: boolean;
   waId: string;
   sessionId: string;
   /** Every garment in the basket. One order, however many lines. */
@@ -265,12 +273,15 @@ export async function createShopifyOrder(
   const hasAddress = Boolean(input.shipping?.address && input.shipping?.city);
   const tags = [
     'whatsapp-bot',
+    ...(input.cod ? ['cod'] : []),
     ...(hasAddress ? [] : ['address-pending']),
     ...(input.test ? ['test-order'] : []),
   ];
 
   const note = [
-    'Paid on WhatsApp via a Razorpay payment link.',
+    input.cod
+      ? 'Cash on delivery, confirmed on WhatsApp. Collect payment at the door.'
+      : 'Paid on WhatsApp via a Razorpay payment link.',
     input.paymentId ? `Razorpay payment ${input.paymentId}.` : null,
     hasAddress
       ? 'Shipping address collected in the chat.'
@@ -283,7 +294,14 @@ export async function createShopifyOrder(
 
   const order: Record<string, unknown> = {
     currency: 'INR',
-    financialStatus: 'PAID',
+    /*
+     * PENDING for cash on delivery, and no transaction at all.
+     *
+     * PAID with a SALE transaction would tell Shopify money had arrived, which
+     * would show up in the day's revenue, in payouts that never reconcile, and
+     * on a packing slip saying nothing is owed. The courier collects it.
+     */
+    financialStatus: input.cod ? 'PENDING' : 'PAID',
     /*
      * The channel a merchant sees is the app's own name, not this.
      *
@@ -311,14 +329,18 @@ export async function createShopifyOrder(
      */
     ...(input.coupon ? { discountCode: toOrderDiscount(input.coupon) } : {}),
     lineItems,
-    transactions: [
-      {
-        kind: 'SALE',
-        status: 'SUCCESS',
-        gateway: 'razorpay',
-        amountSet: priceSet,
-      },
-    ],
+    ...(input.cod
+      ? {}
+      : {
+          transactions: [
+            {
+              kind: 'SALE',
+              status: 'SUCCESS',
+              gateway: 'razorpay',
+              amountSet: priceSet,
+            },
+          ],
+        }),
     customAttributes: [
       { key: 'WhatsApp number', value: input.waId },
       { key: 'Razorpay payment id', value: input.paymentId ?? 'unknown' },
