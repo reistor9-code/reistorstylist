@@ -1,5 +1,5 @@
 import type { Env } from './types';
-import { CATEGORIES, OCCASIONS, SHOPIFY_CACHE_KEY, filterProducts, getProducts, isInStock, productMetafields, provisionCatalog, shopifyFetch, shopifyHost } from './catalog';
+import { CATEGORIES, OCCASIONS, SHOPIFY_CACHE_KEY, filterProducts, getProducts, isInStock, productMetafields, provisionCatalog, relinkCatalog, syncCatalogItems, shopifyFetch, shopifyHost } from './catalog';
 import { COPY } from './copy';
 import { graphCall } from './whatsapp';
 
@@ -636,6 +636,96 @@ export async function handleAdmin(
         status: 200,
         headers: { 'content-type': 'application/json' },
       });
+    }
+
+    /*
+     * Moves the catalog to the WABA that needs it.
+     *
+     * A catalog can be linked to one WhatsApp Business Account only, so a
+     * business with a test account and a live one has to unlink before it can
+     * link. Candidates default to the three WABAs on this business; override
+     * with &from=id,id.
+     *
+     *   /admin/relink?token=<VERIFY_TOKEN>&to=<WABA_ID>[&catalog=<id>][&from=<id,id>]
+     */
+    /*
+     * Pushes the catalog to Meta in slices.
+     *
+     * One item per size means roughly 3,400 of them, which is more than a
+     * single Worker invocation's CPU budget. Each call does `limit` variants
+     * from `offset` and reports whether more remain, so a full sync is a short
+     * sequence of requests rather than one that times out half-written.
+     *
+     *   /admin/sync?token=<VERIFY_TOKEN>[&limit=400][&offset=0][&prune=1]
+     */
+    if (path === '/admin/sync' && request.method === 'GET') {
+      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      const catalogId = url.searchParams.get('catalog') ?? env.CATALOG_ID;
+      if (!catalogId) return new Response('CATALOG_ID unset', { status: 400 });
+
+      const limit = Number(url.searchParams.get('limit') ?? 400);
+      const offset = Number(url.searchParams.get('offset') ?? 0);
+      // Deleting what is no longer live only makes sense on a whole-catalog
+      // pass; a slice cannot tell stale from not-yet-reached.
+      const prune = url.searchParams.get('prune') === '1';
+
+      try {
+        const products = await getProducts(env);
+        // ?only=<productId> syncs one garment's sizes — enough to test a
+        // catalog change without pushing thousands of items again.
+        const only = url.searchParams.get('only') ?? undefined;
+        const result = await syncCatalogItems(env, catalogId, products, {
+          limit: prune || only ? undefined : limit,
+          offset: only ? 0 : offset,
+          prune,
+          only,
+        });
+        console.log('[admin:sync]', JSON.stringify({ ...result, batches: undefined }));
+        return new Response(JSON.stringify(result, null, 2), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err) {
+        console.log('[admin:sync-error]', String(err));
+        return new Response(JSON.stringify({ error: String(err) }, null, 2), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
+    }
+
+    if (path === '/admin/relink' && request.method === 'GET') {
+      if (!env.VERIFY_TOKEN || url.searchParams.get('token') !== env.VERIFY_TOKEN) {
+        return new Response('Forbidden', { status: 403 });
+      }
+      const target = url.searchParams.get('to');
+      const catalogId = url.searchParams.get('catalog') ?? env.CATALOG_ID;
+      if (!target || !catalogId) {
+        return new Response('Missing ?to=<WABA_ID> (and CATALOG_ID unset)', { status: 400 });
+      }
+
+      const from = (url.searchParams.get('from') ?? '')
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+      const candidates = Array.from(new Set([...from, target]));
+
+      try {
+        const result = await relinkCatalog(env, catalogId, target, candidates);
+        console.log('[admin:relink]', JSON.stringify(result));
+        return new Response(JSON.stringify(result, null, 2), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      } catch (err) {
+        console.log('[admin:relink-error]', String(err));
+        return new Response(JSON.stringify({ error: String(err) }, null, 2), {
+          status: 500,
+          headers: { 'content-type': 'application/json' },
+        });
+      }
     }
 
     if (path === '/admin/catalog' && request.method === 'GET') {

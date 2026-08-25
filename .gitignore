@@ -12,3 +12,6 @@ dist/
 
 # Generated dashboard snapshots (npm run dashboard:preview)
 web/
+
+# Node build output (npm run build:node)
+dist-node/

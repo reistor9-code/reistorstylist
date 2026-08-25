@@ -9,6 +9,7 @@
  */
 
 import type { Env } from './types';
+import { toShopifyAddress, type ShippingAddress } from './address';
 import { getProducts, shopifyFetch, shopifyGraphql } from './catalog';
 import { formatINR } from './copy';
 import { LIMITS, sendButtons, sendList, sendText } from './whatsapp';
@@ -163,6 +164,8 @@ export interface OrderLine {
 }
 
 export interface OrderPushInput {
+  /** Collected in the chat with an address_message. See src/address.ts. */
+  shipping?: ShippingAddress;
   waId: string;
   sessionId: string;
   /** Every garment in the basket. One order, however many lines. */
@@ -251,12 +254,24 @@ export async function createShopifyOrder(
         };
   });
 
-  const tags = ['whatsapp-bot', 'address-pending', ...(input.test ? ['test-order'] : [])];
+  /*
+   * `address-pending` only when there genuinely is none. It is what the
+   * fulfilment team filters on, so tagging an order that has a full address
+   * would send someone chasing a customer who already gave it.
+   */
+  const hasAddress = Boolean(input.shipping?.address && input.shipping?.city);
+  const tags = [
+    'whatsapp-bot',
+    ...(hasAddress ? [] : ['address-pending']),
+    ...(input.test ? ['test-order'] : []),
+  ];
 
   const note = [
     'Paid on WhatsApp via a Razorpay payment link.',
     input.paymentId ? `Razorpay payment ${input.paymentId}.` : null,
-    'Shipping address NOT collected — Razorpay payment links cannot capture one. Follow up with the customer before fulfilling.',
+    hasAddress
+      ? 'Shipping address collected in the chat.'
+      : 'Shipping address NOT collected. Follow up with the customer before fulfilling.',
     input.test ? 'TEST ORDER — created while Razorpay was in test mode. Safe to delete.' : null,
   ]
     .filter(Boolean)
@@ -269,6 +284,9 @@ export async function createShopifyOrder(
     note,
     tags,
     phone: input.contact || `+${input.waId.replace(/\D/g, '')}`,
+    ...(input.shipping
+      ? { shippingAddress: toShopifyAddress(input.shipping, `+${input.waId.replace(/\D/g, '')}`) }
+      : {}),
     lineItems,
     transactions: [
       {

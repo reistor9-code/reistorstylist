@@ -33,6 +33,52 @@ CATALOG_IMAGE_TRANSFORM = "width=1080&height=1080&crop=top"
 # /admin/metafields resolves that to a CDN url.
 PDP_IMAGE_METAFIELD = "custom.kwikengage_product_image"
 
+# Which checkout the Buy Now button opens.
+#   whatsapp — order_details; the payment sheet opens INSIDE the chat. Needs
+#              WHATSAPP_PAYMENT_CONFIG plus a verified business, and falls back
+#              to a Razorpay link if Meta rejects the send
+#   razorpay — a payment link, opened in WhatsApp's in-app browser
+#   fastrr   — a Shopify cart permalink; Shiprocket's Fastrr panel takes over
+#   gokwik   — the identical permalink; GoKwik takes over instead
+#
+# fastrr and gokwik send the SAME url. Which one answers is decided by the app
+# installed on reistor.in — and GoKwik's script actively neutralises Fastrr, so
+# Fastrr cannot take over until GoKwik is removed from the store.
+CHECKOUT_PROVIDER = "whatsapp"
+
+# Where that link lands: "cart" (default) or "checkout". One-click apps replace
+# the button on the cart page, so jumping straight to /checkout bypasses them
+# and hands the shopper Shopify's own checkout.
+CHECKOUT_LANDING = "cart"
+
+# Per-occasion category artwork — 30 cards in dashboard/public/categories,
+# one set per occasion. "off" falls back to the shared images on CATEGORIES,
+# which is the behaviour before the photography landed. Flip to "on" once the
+# images have been checked in a real chat.
+CATEGORY_ARTWORK_ENABLED = "off"
+
+# Point product carousel cards at a size variant, so WhatsApp renders its own
+# size selector on the product page. "off" uses the product-level id, which is
+# what Meta accepts today — a freshly synced variant can be in the catalog and
+# still be refused by the messaging layer. Turn on only after a variant id has
+# actually sent.
+CATALOG_VARIANTS = "off"
+
+# Ask for a delivery address before checkout, using WhatsApp's India address
+# form. Needs no entitlement — unlike payments — so the order reaches Shopify
+# fulfillable instead of tagged address-pending. "off" restores the old
+# behaviour. See src/address.ts.
+ADDRESS_CAPTURE = "on"
+
+# How the occasion and category pickers are sent.
+#   list     — interactive list messages. Free service messages, no template
+#              approval and no billing, but no photography either
+#   template — the approved carousels (default), with a list as the fallback
+#              whenever a send is rejected
+# Set to "list" while templates are pending approval or the account has no
+# payment method, so the flow reaches checkout either way.
+PICKER_MODE = "list"
+
 # Occasion / category pickers are approved carousel Marketing templates,
 # billed at ~₹0.86 per delivered message (Meta's test number does not bill).
 # A rejected send falls back to asking for a typed answer, not to a list.

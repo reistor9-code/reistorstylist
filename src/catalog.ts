@@ -234,6 +234,9 @@ export async function getProducts(env: Env): Promise<Product[]> {
   return mapped;
 }
 
+/** Where the picker artwork is served from — see dashboard/public/. */
+const CATEGORY_IMAGE_BASE = 'https://reistor-dashboard.pages.dev/categories';
+
 export const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL', '2XL', '3XL', '4XL', '5XL'];
 
 /*
@@ -375,6 +378,60 @@ export const CATEGORIES = [
   },
 ] as const;
 
+/**
+ * Category artwork, per occasion.
+ *
+ * The six categories are the same everywhere, but a shopper dressing for a
+ * meeting and one packing for a beach should not be shown the same jacket.
+ * Card copy already varies this way — see CATEGORY_BLURBS — and the images are
+ * a send-time parameter, so they can vary without a new template.
+ *
+ * Keyed occasion → category. Anything missing falls back to the shared image
+ * on CATEGORIES, so an occasion can be filled in one category at a time and a
+ * gap costs a generic card rather than a broken one.
+ */
+/**
+ * Which occasions have their own category artwork, and for which garments.
+ *
+ * The six categories are the same everywhere, but a shopper dressing for a
+ * meeting and one dressing for dinner should not be shown the same jacket.
+ * Card copy already varies this way — see CATEGORY_BLURBS — and images are a
+ * send-time parameter, so they vary without a new template.
+ *
+ * Listed rather than derived, so a category with no photograph yet falls back
+ * to the shared image instead of pointing at a URL that 404s. Files live at
+ * assets/categories/<occasion>/<category>.jpg and are published by
+ * `npm run cards`; adding an occasion here means adding its six files too.
+ */
+export const CATEGORY_ARTWORK: Record<string, readonly string[]> = {
+  work: ['tops', 'dresses', 'bottoms', 'jackets', 'jumpsuits', 'coords'],
+  dinner: ['tops', 'dresses', 'bottoms', 'jackets', 'jumpsuits', 'coords'],
+  lounge: ['tops', 'dresses', 'bottoms', 'jackets', 'jumpsuits', 'coords'],
+  vacation: ['tops', 'dresses', 'bottoms', 'jackets', 'jumpsuits', 'coords'],
+  casual: ['tops', 'dresses', 'bottoms', 'jackets', 'jumpsuits', 'coords'],
+};
+
+/**
+ * The card image for one category, given the occasion the shopper picked.
+ *
+ * Held behind CATEGORY_ARTWORK_ENABLED so the photography can ship and be
+ * switched on separately. Off, every card falls back to the shared image on
+ * CATEGORIES exactly as before — the map above stays populated, so it still
+ * records which occasions are ready rather than losing that when it is off.
+ */
+export function categoryImage(
+  env: Env,
+  occasion: string | undefined,
+  categoryId: string,
+): string {
+  const enabled = (env.CATEGORY_ARTWORK_ENABLED || 'off').toLowerCase() === 'on';
+  if (enabled && occasion && CATEGORY_ARTWORK[occasion]?.includes(categoryId)) {
+    return `${CATEGORY_IMAGE_BASE}/${occasion}/${categoryId}.jpg`;
+  }
+  return CATEGORIES.find((c) => c.id === categoryId)?.image ?? '';
+}
+
+
 export const occasionLabel = (id?: string) => OCCASIONS.find((o) => o.id === id)?.label ?? 'this occasion';
 export const occasionPhrase = (id?: string) => OCCASIONS.find((o) => o.id === id)?.phrase ?? 'the day ahead';
 export const categoryLabel = (id?: string) => CATEGORIES.find((c) => c.id === id)?.label ?? 'this category';
@@ -444,6 +501,65 @@ export function checkoutUrl(product: Product, size: string): string {
   return url.toString();
 }
 
+/**
+ * One GoKwik checkout for a whole basket.
+ *
+ * Shopify's cart permalink takes several lines — /cart/<v1>:1,<v2>:1 — so the
+ * sizing loop can hand the entire bag over in a single URL rather than sending
+ * the shopper through checkout once per garment. GoKwik intercepts that
+ * checkout on reistor.in, which is why no GoKwik API call is involved.
+ *
+ * Returns null when not one line resolves to a variant id, so the caller can
+ * say so rather than opening an empty cart.
+ */
+export function cartCheckoutUrl(
+  env: Env,
+  products: Product[],
+  lines: { productId: string; size: string }[],
+): string | null {
+  const byId = new Map(products.map((p) => [p.id, p]));
+  const parts: string[] = [];
+  let origin: string | undefined;
+
+  for (const line of lines) {
+    const product = byId.get(line.productId);
+    const variantId = product?.sizes.find((s) => s.size === line.size)?.variantId;
+    if (!product || !variantId) {
+      console.log('[checkout:no-variant]', line.productId, line.size);
+      continue;
+    }
+    origin ??= new URL(product.productUrl).origin;
+    parts.push(`${variantId}:1`);
+  }
+
+  if (!parts.length || !origin) return null;
+
+  const url = new URL(`/cart/${parts.join(',')}`, origin);
+
+  /*
+   * Land on the cart page, not straight in checkout.
+   *
+   * A bare /cart/<variant>:1 adds the items and redirects to /checkout without
+   * ever rendering the cart page — and both GoKwik and Fastrr work by
+   * replacing the checkout BUTTON on that page. Skip the page, skip the
+   * script, and the shopper gets Shopify's own checkout instead of the
+   * one-click panel. It costs one extra tap and is the difference between the
+   * one-click checkout running and not.
+   *
+   * CHECKOUT_LANDING=checkout restores the old behaviour if a future app
+   * intercepts the permalink directly.
+   */
+  if ((env.CHECKOUT_LANDING || 'cart').toLowerCase() !== 'checkout') {
+    url.searchParams.set('return_to', '/cart');
+  }
+
+  // Read back by the nightly pull to attribute the order to the bot.
+  url.searchParams.set('utm_source', 'whatsapp');
+  url.searchParams.set('utm_medium', 'ai-stylist');
+  return url.toString();
+}
+
+
 /* ------------------------------------------------------------------ *
  * State (KV, one record per wa_id)
  * ------------------------------------------------------------------ */
@@ -493,59 +609,171 @@ export function catalogImage(env: Env, url: string): string {
   return `${url}${url.includes('?') ? '&' : '?'}${transform}`;
 }
 
+/**
+ * The catalog id for one size of one garment.
+ *
+ * Variants need their own retailer_id, and it has to be derivable both ways:
+ * forward when the catalog is built, backward when a sent cart arrives
+ * carrying only these ids. `<productId>-<size>` does both without a lookup
+ * table, and stays stable if Shopify reissues a variant id.
+ */
+export const variantRetailerId = (productId: string, size: string) =>
+  `${productId}-${size.toUpperCase().replace(/[^A-Z0-9]/g, '')}`;
+
+/** Reads one back. Returns null for a plain product id from the old catalog. */
+export function parseVariantRetailerId(
+  retailerId: string,
+): { productId: string; size: string } | null {
+  const at = retailerId.lastIndexOf('-');
+  if (at <= 0) return null;
+  return { productId: retailerId.slice(0, at), size: retailerId.slice(at + 1) };
+}
+
+/**
+ * The variant a product message should point at.
+ *
+ * A carousel card takes one retailer_id, but the shopper should land on the
+ * group and choose from it — so the card points at the first size actually in
+ * stock. Meta renders the whole group's size selector from there, which is the
+ * point of the exercise.
+ */
+export function primaryRetailerId(env: Env, p: Product): string {
+  /*
+   * Off until variant items are proven sendable.
+   *
+   * A variant can sit in the catalog as in-stock and published while WhatsApp
+   * still answers "product not found for product_retailer_id" — the messaging
+   * index lags the catalog API by an unknown amount on newly created items,
+   * and it is not certain a variant is addressable in a product message at
+   * all. Pointing cards at ids Meta will not accept turns every carousel into
+   * "those looks are not reachable", so this stays off until a real send
+   * succeeds.
+   */
+  if ((env.CATALOG_VARIANTS || 'off').toLowerCase() !== 'on') return p.id;
+
+  const inStock = p.sizes.find((s) => s.stock > 0) ?? p.sizes[0];
+  return inStock ? variantRetailerId(p.id, inStock.size) : p.id;
+}
+
+/**
+ * Pushes the catalog to Meta, one item per size.
+ *
+ * The catalog used to hold one item per product, which is why a sent cart
+ * arrived with no size and why the bot then had to ask for one garment at a
+ * time. Grouping sizes under `item_group_id` moves that choice onto WhatsApp's
+ * own product page: the shopper picks the size there, sees which sizes are
+ * actually in stock, and the cart arrives ready to charge.
+ *
+ * Meta requires every variant field to be populated on every item in a group,
+ * and the name to be identical across it — otherwise the group silently does
+ * not render as one product.
+ *
+ * `limit` and `offset` exist because this is now ~3,400 items rather than 481.
+ * A full sync is more than one Worker invocation's CPU budget, so the nightly
+ * job walks it in slices.
+ */
 export async function syncCatalogItems(
   env: Env,
   catalogId: string,
   products: Product[],
+  opts: { limit?: number; offset?: number; prune?: boolean; only?: string } = {},
 ): Promise<Record<string, unknown>> {
+  const { limit, offset = 0, prune = true, only } = opts;
+  if (only) products = products.filter((p) => p.id === only);
+
   const existing = await existingRetailerIds(env, catalogId);
-  const live = new Set(products.map((p) => p.id));
 
-  const upserts = products.map((p) => ({
-    method: existing.has(p.id) ? 'UPDATE' : 'CREATE',
-    retailer_id: p.id,
-    data: {
-      name: p.title,
-      description: `${cap(p.fabric)}, ${p.attributes}.`,
-      url: p.productUrl,
-      // Collections are product sets filtered on a field, so the category has
-      // to exist on the item itself. This is what groups the catalogue into
-      // Tops / Dresses / Bottoms in WhatsApp.
-      product_type: categoryLabel(p.category),
-      image_url: catalogImage(env, p.imageUrl),
-      // Extras beyond the primary become the PDP's swipeable gallery. Meta
-      // caps a product at 10 images, so the primary plus 9 additional.
-      ...(p.imageUrls && p.imageUrls.length > 1
-        ? { additional_image_urls: p.imageUrls.slice(1, 10).map((u) => catalogImage(env, u)) }
-        : {}),
-      price: p.priceINR * 100,
-      currency: 'INR',
-      availability: isInStock(p) ? 'in stock' : 'out of stock',
-      condition: 'new',
-      brand: 'Reistor',
-    },
-  }));
+  /* Every size of every garment, flattened. */
+  const all = products.flatMap((p) =>
+    p.sizes.map((s) => ({ product: p, size: s })),
+  );
+  const live = new Set(all.map(({ product, size }) => variantRetailerId(product.id, size.size)));
 
-  const stale = [...existing].filter((id) => !live.has(id));
+  const slice = limit ? all.slice(offset, offset + limit) : all;
+
+  /*
+   * items_batch, not batch.
+   *
+   * The older /batch endpoint validates against a whitelist that has no
+   * item_group_id in it — it answers "Invalid keys "item_group_id" were found
+   * in param "data"" and writes nothing. /items_batch takes the full feed
+   * field set, which is where variants live.
+   *
+   * Its field names are the feed's, not the older endpoint's: `id` rather than
+   * a request-level retailer_id, `title`, `link`, `image_link`, and a price
+   * that is a string carrying its own currency.
+   */
+  const upserts = slice.map(({ product: p, size }) => {
+    const id = variantRetailerId(p.id, size.size);
+    return {
+      method: existing.has(id) ? 'UPDATE' : 'CREATE',
+      data: {
+        id,
+        // Identical across the group, or Meta shows them as separate products.
+        title: p.title,
+        description: `${cap(p.fabric)}, ${p.attributes}.`,
+        link: p.productUrl,
+        // Collections are product sets filtered on a field, so the category
+        // has to exist on the item itself.
+        product_type: categoryLabel(p.category),
+        image_link: catalogImage(env, p.imageUrl),
+        ...(p.imageUrls && p.imageUrls.length > 1
+          ? {
+              additional_image_link: p.imageUrls
+                .slice(1, 10)
+                .map((u) => catalogImage(env, u))
+                .join(','),
+            }
+          : {}),
+        price: `${p.priceINR.toFixed(2)} INR`,
+        // Per size, which is the gain: a sold-out size is unpickable on the
+        // product page rather than filtered out afterwards.
+        availability: size.stock > 0 ? 'in stock' : 'out of stock',
+        condition: 'new',
+        brand: 'Reistor',
+        /* What makes the sizes one product with a selector. */
+        /*
+         * Prefixed so it cannot equal a retailer_id.
+         *
+         * The group id was the bare product id, which is also the retailer_id
+         * of the original product-level item still in the catalog. A group
+         * whose id collides with a product is a plausible reason Meta accepts
+         * the items but will not address them in a message.
+         */
+        item_group_id: `grp-${p.id}`,
+        size: size.size,
+      },
+    };
+  });
+
+  /*
+   * Pruning is skipped on a partial sync. `existing` holds every id in the
+   * catalog, so a slice would see the sizes it is not carrying as stale and
+   * delete the rest of the catalog.
+   */
+  const stale = prune && !limit ? [...existing].filter((id) => !live.has(id)) : [];
+
   const requests = [
     ...upserts,
-    ...stale.map((retailer_id) => ({ method: 'DELETE', retailer_id })),
+    ...stale.map((id) => ({ method: 'DELETE', data: { id } })),
   ];
 
   const batches: { status: number; body: unknown }[] = [];
   for (let i = 0; i < requests.length; i += 100) {
     batches.push(
-      await graphCall(env, `${catalogId}/batch`, {
+      await graphCall(env, `${catalogId}/items_batch`, {
         method: 'POST',
-        body: { requests: requests.slice(i, i + 100) },
+        body: { item_type: 'PRODUCT_ITEM', requests: requests.slice(i, i + 100) },
       }),
     );
   }
 
   return {
+    variants: all.length,
     created: upserts.filter((r) => r.method === 'CREATE').length,
     updated: upserts.filter((r) => r.method === 'UPDATE').length,
     deleted: stale.length,
+    ...(limit ? { offset, sliceSize: slice.length, more: offset + slice.length < all.length } : {}),
     batches: batches.map((b) => ({ status: b.status, body: b.body })),
   };
 }
@@ -558,6 +786,68 @@ export async function syncCatalogItems(
  *
  * Pass `catalog=<id>` to skip creation and use an existing catalog.
  */
+/**
+ * Moves the catalog from whichever WABA holds it to the one that needs it.
+ *
+ * Meta allows a catalog to be linked to exactly one WhatsApp Business Account,
+ * and answers a second link attempt with error_subcode 2388099. A business that
+ * has accumulated more than one WABA — a test account, an older one, the live
+ * one — therefore has to unlink before it can link, and there is no way to ask
+ * "which WABA holds this catalog" directly. So each candidate is read in turn.
+ *
+ * Deliberately separate from provisionCatalog(), which re-syncs every product
+ * after linking. Moving a link is not a reason to push 481 items through the
+ * Graph API again, and that sync is what risks the Worker's CPU budget.
+ */
+export async function relinkCatalog(
+  env: Env,
+  catalogId: string,
+  target: string,
+  candidates: string[],
+): Promise<Record<string, unknown>> {
+  const steps: Record<string, unknown> = { catalogId, target };
+
+  // Which WABAs currently hold it. Read before anything is changed.
+  const holders: string[] = [];
+  const inspected: Record<string, unknown> = {};
+  for (const waba of candidates) {
+    const res = await graphCall(env, `${waba}/product_catalogs?fields=id,name`);
+    const data = (res.body as { data?: { id?: string }[] })?.data ?? [];
+    inspected[waba] = data.map((c) => c.id);
+    if (data.some((c) => c.id === catalogId)) holders.push(waba);
+  }
+  steps.inspected = inspected;
+  steps.heldBy = holders;
+
+  if (holders.includes(target)) {
+    steps.result = 'already linked to the target — nothing to do';
+    return steps;
+  }
+
+  // Unlink from every holder. Usually one, but a stale link would block us.
+  const unlinked: Record<string, unknown> = {};
+  for (const waba of holders) {
+    unlinked[waba] = await graphCall(
+      env,
+      `${waba}/product_catalogs?catalog_id=${encodeURIComponent(catalogId)}`,
+      { method: 'DELETE' },
+    );
+  }
+  steps.unlinked = unlinked;
+
+  steps.linked = await graphCall(env, `${target}/product_catalogs`, {
+    method: 'POST',
+    body: { catalog_id: catalogId },
+  });
+
+  // Read back rather than trusting the write.
+  const after = await graphCall(env, `${target}/product_catalogs?fields=id,name`);
+  steps.after = after.body;
+
+  return steps;
+}
+
+
 export async function provisionCatalog(
   env: Env,
   business: string,
@@ -591,9 +881,14 @@ export async function provisionCatalog(
     body: { catalog_id: catalogId },
   });
 
+  /*
+   * Only the first slice. One item per size is thousands of them, which will
+   * not finish inside one invocation — /admin/sync walks the rest.
+   */
   const products = await getProducts(env);
-  steps.items = await syncCatalogItems(env, catalogId, products);
+  steps.items = await syncCatalogItems(env, catalogId, products, { limit: 400, offset: 0 });
   steps.itemCount = products.length;
+  steps.next = 'Continue with /admin/sync?offset=400 until "more" reads false.';
   steps.next = `Set CATALOG_ID = "${catalogId}" in wrangler.toml, then redeploy.`;
 
   return steps;

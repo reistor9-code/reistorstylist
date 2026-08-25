@@ -4,15 +4,20 @@ import { COPY, cap, fill, formatINR } from './copy';
 import {
   CATEGORIES,
   OCCASIONS,
+  CATEGORY_BLURBS,
+  categoryImage,
   categoryLabel,
+  cartCheckoutUrl,
   checkoutUrl,
   filterProducts,
   getProducts,
   inStockSizes,
   occasionLabel,
   occasionPhrase,
+  primaryRetailerId,
 } from './catalog';
 import { rankLayers } from './ranking';
+import { markCheckoutSent } from './fastrr';
 import {
   LIMITS,
   sendButtons,
@@ -77,8 +82,46 @@ export async function clearState(env: Env, waId: string): Promise<void> {
  * Flow steps
  * ------------------------------------------------------------------ */
 
+/**
+ * Whether to skip the carousel templates entirely.
+ *
+ * The pickers are Marketing templates, so they need approval and they bill on
+ * every send. A list message is a service message: free inside the 24-hour
+ * window, no approval, no billing. Set PICKER_MODE=list to use lists while
+ * templates are pending — or permanently, if the photography is not worth the
+ * per-send cost.
+ */
+const listPickers = (env: Env) => (env.PICKER_MODE || 'template').toLowerCase() === 'list';
+
+/**
+ * The occasion picker as a list.
+ *
+ * Also the fallback when the template send is rejected — a paused template, an
+ * unapproved one, marketing opted out, or no payment method on the account.
+ * Rows carry the same `occ:` ids the carousel buttons do, so a tap lands in the
+ * same handler and the flow does not know the difference.
+ */
+async function occasionList(env: Env, to: string): Promise<boolean> {
+  return sendList(env, to, {
+    header: COPY.occasionHeader,
+    body: COPY.tapAnOption,
+    button: 'Choose',
+    rows: OCCASIONS.map((o) => ({
+      id: `occ:${o.id}`,
+      title: o.label,
+      description: o.blurb,
+    })),
+  });
+}
+
 export async function askOccasion(env: Env, to: string, state: State): Promise<void> {
   state.step = 'occasion';
+
+  if (listPickers(env)) {
+    if (await occasionList(env, to)) return;
+    await sendText(env, to, COPY.occasionTypePrompt);
+    return;
+  }
 
   const sent = await sendCarouselTemplate(
     env,
@@ -93,9 +136,14 @@ export async function askOccasion(env: Env, to: string, state: State): Promise<v
   );
   if (sent) return;
 
-  // Template paused on quality or the shopper opted out of marketing. Ask for
-  // a typed answer rather than stranding them mid-flow.
-  console.log('[carousel:rejected] occasion');
+  /*
+   * Template paused on quality, still pending approval, or rejected because
+   * the account has no payment method. A list keeps the shopper choosing from
+   * options rather than guessing at spellings, which the typed prompt below
+   * asked them to do.
+   */
+  console.log('[carousel:rejected] occasion — falling back to a list');
+  if (await occasionList(env, to)) return;
   await sendText(env, to, COPY.occasionTypePrompt);
 }
 
@@ -113,9 +161,37 @@ export async function askCategory(env: Env, to: string, state: State): Promise<v
    * paused — that send is rejected, and the code below drops to a typed
    * prompt rather than leaving the shopper with nothing.
    */
+  /*
+   * The list carries the same per-occasion wording the templates do, read from
+   * CATEGORY_BLURBS rather than frozen at approval — so a list picker is
+   * actually more current than the carousel it stands in for.
+   */
+  const categoryRows = () =>
+    CATEGORIES.map((c) => ({
+      id: `cat:${c.id}`,
+      title: c.label,
+      description:
+        (state.occasion ? CATEGORY_BLURBS[state.occasion]?.[c.id] : undefined) ?? c.blurb,
+    }));
+
+  const categoryList = () =>
+    sendList(env, to, {
+      header: COPY.categoryHeader,
+      body: COPY.tapAnOption,
+      button: 'Choose',
+      rows: categoryRows(),
+    });
+
+  if (listPickers(env)) {
+    if (await categoryList()) return;
+    await sendText(env, to, COPY.categoryTypePrompt);
+    return;
+  }
+
   const base = env.CATEGORY_TEMPLATE || 'category_picker';
+  // Artwork varies by occasion where it exists; see CATEGORY_IMAGES.
   const cards = CATEGORIES.map((c) => ({
-    imageUrl: c.image,
+    imageUrl: categoryImage(env, state.occasion, c.id),
     bodyParams: [],
     payload: `cat:${c.id}`,
   }));
@@ -128,7 +204,8 @@ export async function askCategory(env: Env, to: string, state: State): Promise<v
 
   if (await sendCarouselTemplate(env, to, base, cards)) return;
 
-  console.log('[carousel:rejected] category');
+  console.log('[carousel:rejected] category — falling back to a list');
+  if (await categoryList()) return;
   await sendText(env, to, COPY.categoryTypePrompt);
 }
 
@@ -168,7 +245,13 @@ export async function sendLooks(
       category: categoryLabel(state.category),
     });
 
-  const ids = products.map((p) => p.id);
+  /*
+   * A card carries one retailer_id, and the catalog now holds one item per
+   * size. Pointing at the first in-stock size lands the shopper on the group,
+   * where WhatsApp renders the size selector — which is where sizing happens
+   * now instead of in the chat.
+   */
+  const ids = products.map((p) => primaryRetailerId(env, p));
   const sentAsProduct =
     products.length >= 2
       ? await sendProductCarousel(env, to, body, ids)
@@ -393,6 +476,79 @@ export async function sendCheckout(
   // typing card details, and a second message there is noise at best.
 }
 
+export interface CheckoutLine {
+  productId: string;
+  title: string;
+  size: string;
+  priceINR: number;
+}
+
+/**
+ * Buy Now, straight into GoKwik.
+ *
+ * GoKwik is not called here and has no API in this path. It is installed on
+ * reistor.in as a Shopify app and intercepts the store's checkout, so handing
+ * the shopper a Shopify cart permalink *is* handing them the GoKwik panel —
+ * one-click, OTP login, COD, RTO scoring and all.
+ *
+ * The whole basket goes in one URL, so a shopper who sized four garments
+ * checks out once rather than four times.
+ */
+export async function sendStoreCheckout(
+  env: Env,
+  to: string,
+  state: State,
+  all: Product[],
+  lines: CheckoutLine[],
+): Promise<void> {
+  const url = cartCheckoutUrl(env, all, lines);
+
+  /*
+   * No variant id on any line — an item cached before ids were carried, or a
+   * size that has since been removed in Shopify. Opening an empty cart would
+   * look like the bot broke, so the shopper gets a route to a human instead.
+   */
+  if (!url) {
+    console.log('[checkout:unavailable]', lines.length, 'lines');
+    await sendButtons(env, to, COPY.checkoutUnavailable, [
+      { id: 'act:callback', title: 'Talk to Stylist' },
+      { id: 'act:main_menu', title: 'Main Menu' },
+    ]);
+    return;
+  }
+
+  state.step = 'checkout';
+  state.currentLookId = lines[0]?.productId;
+
+  const total = lines.reduce((sum, l) => sum + l.priceINR, 0);
+
+  // One line reads as a sentence; several read as a bag, itemised so the
+  // shopper can check the sizes before they are in a payment sheet.
+  let body: string;
+  if (lines.length === 1) {
+    const only = lines[0];
+    body = `${only.title}, size ${only.size} — ${formatINR(only.priceINR)}. ${COPY.checkoutBody}`;
+  } else {
+    const itemised = lines.map((l) => `${l.title} · ${l.size}`).join('\n');
+    const summary = fill(COPY.checkoutBodyMulti, {
+      count: String(lines.length),
+      total: formatINR(total),
+    });
+    body = `${itemised}\n\n${summary}`;
+  }
+
+  /*
+   * Written before the button goes out, not after. The shopper can be through
+   * a one-click checkout in seconds, and a webhook that arrives before the
+   * record exists has no thread to answer in.
+   */
+  await markCheckoutSent(env, to, state, lines, url);
+
+  await sendCtaUrl(env, to, body, 'Buy Now', url);
+
+  // Nothing follows the button, for the same reason as above.
+}
+
 export async function confirmOrder(env: Env, to: string, state: State): Promise<void> {
   state.step = 'done';
   await sendButtons(env, to, COPY.orderConfirmed, [
@@ -458,7 +614,13 @@ export async function browseCategory(
     category: categoryLabel(state.category),
   });
 
-  const sent = await sendProductCarousel(env, to, body, picks);
+  const byId = new Map(all.map((p) => [p.id, p]));
+  const retailerIds = picks
+    .map((id) => byId.get(id))
+    .filter((p): p is Product => Boolean(p))
+    .map((p) => primaryRetailerId(env, p));
+
+  const sent = await sendProductCarousel(env, to, body, retailerIds);
 
   if (!sent) {
     console.log('[browse-category:rejected]', picks.length, `catalog=${env.CATALOG_ID ?? 'unset'}`);

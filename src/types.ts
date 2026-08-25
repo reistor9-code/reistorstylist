@@ -56,6 +56,58 @@ export interface Env {
   IND_SHOPIFY_API_VERSION?: string;
   IND_SHOPIFY_API_KEY?: string;
   IND_SHOPIFY_API_SECRET?: string;
+  /**
+   * Which checkout Buy Now opens.
+   *
+   *   fastrr   — Shopify cart permalink; Shiprocket's Fastrr panel takes over
+   *   gokwik   — the same permalink; GoKwik takes over instead
+   *   razorpay — an in-chat payment link, which also creates the Shopify order
+   *
+   * fastrr and gokwik send an identical URL: which one answers is decided by
+   * the app installed on reistor.in, not here. They are separate values only
+   * so the logs and the confirmation route say which one is expected.
+   */
+  CHECKOUT_PROVIDER?: string;
+  /**
+   * Where the checkout link lands — "cart" (default) or "checkout".
+   *
+   * One-click apps replace the button on the cart page, so a link that jumps
+   * straight to /checkout bypasses them. See cartCheckoutUrl().
+   */
+  CHECKOUT_LANDING?: string;
+  /**
+   * "on" serves the per-occasion category photography in
+   * dashboard/public/categories; anything else falls back to the shared
+   * images on CATEGORIES. See categoryImage().
+   */
+  /**
+   * "on" points product carousel cards at a size variant so WhatsApp shows
+   * its size selector. Off (default) uses the product-level id, which is
+   * what Meta currently accepts. See primaryRetailerId().
+   */
+  CATALOG_VARIANTS?: string;
+  CATEGORY_ARTWORK_ENABLED?: string;
+  /**
+   * The payment configuration name Meta generates in WhatsApp Manager →
+   * Payment configurations → India, with Razorpay authorised. Required for
+   * CHECKOUT_PROVIDER="whatsapp"; see src/inapp.ts.
+   */
+  WHATSAPP_PAYMENT_CONFIG?: string;
+  /** Fastrr (Shiprocket Checkout) webhook signing secret. See src/fastrr.ts. */
+  FASTRR_WEBHOOK_SECRET?: string;
+  /**
+   * "list" sends the occasion and category pickers as interactive lists
+   * instead of carousel templates — free service messages, no approval and
+   * no billing, at the cost of the photography. Anything else uses the
+   * templates, with a list as the fallback when a send is rejected.
+   */
+  /**
+   * "on" (default) asks for a delivery address with WhatsApp's India
+   * address form before opening checkout, so the Shopify order arrives
+   * fulfillable. See src/address.ts.
+   */
+  ADDRESS_CAPTURE?: string;
+  PICKER_MODE?: string;
   OCCASION_TEMPLATE?: string;
   CATEGORY_TEMPLATE?: string;
   TEMPLATE_LANGUAGE?: string;
@@ -67,6 +119,8 @@ export type Step =
   | 'category'
   | 'top3'
   | 'size'
+  /** Waiting on the address form. Sits between sizing and checkout. */
+  | 'address'
   | 'checkout'
   | 'done';
 

@@ -25,6 +25,7 @@ import { formatINR } from './copy';
 import { markCheckoutOpened, markOrdered, sendPurchaseEvent } from './analytics/capture';
 import { clearCart } from './cart';
 import { createShopifyOrder } from './orders';
+import { loadAddress } from './address';
 import { sendButtons, sendCtaUrl, sendText } from './whatsapp';
 
 export interface PaymentSession {
@@ -77,13 +78,13 @@ export function dummyOrderNumber(sessionId: string): string {
   return `RS${String(hash % 1_000_000).padStart(6, '0')}`;
 }
 
-async function saveSession(env: Env, session: PaymentSession): Promise<void> {
+export async function saveSession(env: Env, session: PaymentSession): Promise<void> {
   await env.STATE.put(sessionKey(session.sessionId), JSON.stringify(session), {
     expirationTtl: SESSION_TTL_SECONDS,
   });
 }
 
-async function loadSession(env: Env, sessionId: string): Promise<PaymentSession | null> {
+export async function loadSession(env: Env, sessionId: string): Promise<PaymentSession | null> {
   const raw = await env.STATE.get(sessionKey(sessionId));
   if (!raw) return null;
   try {
@@ -370,8 +371,18 @@ export async function handleRazorpayWebhook(env: Env, request: Request): Promise
    * and kept on the session, never thrown: the money is already taken, and
    * answering Razorpay with anything but 200 only buys a duplicate webhook.
    */
+  /*
+   * Read here rather than threaded through the checkout, because the
+   * address is stored per shopper and the send functions never needed to
+   * know about it. Absent when address_message was unavailable or the
+   * capture is switched off — the order is then tagged address-pending as
+   * it always was.
+   */
+  const shipping = (await loadAddress(env, session.waId)) ?? undefined;
+
   const push = await createShopifyOrder(env, {
     waId: session.waId,
+    shipping,
     sessionId: session.sessionId,
     lines: session.lines,
     amountINR,
