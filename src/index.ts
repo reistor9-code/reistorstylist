@@ -232,8 +232,21 @@ async function handleOrder(
    * from a catalogue page Meta has not refreshed — carries the old shape.
    */
   const resolved = retailerIds.map((retailerId) => {
+    /*
+     * A bare product id means the primary size.
+     *
+     * The catalog gives its first in-stock size the product id itself, so that
+     * the id a carousel card points at is a member of its own variant group —
+     * which is what makes WhatsApp draw the size selector. The consequence is
+     * that a shopper choosing that size sends the bare id, and reading it as
+     * "no size chosen" would ask them again for the one thing they just
+     * picked.
+     */
     const direct = byId.get(retailerId);
-    if (direct) return { product: direct, size: undefined as string | undefined };
+    if (direct) {
+      const primary = direct.sizes.find((s) => s.stock > 0) ?? direct.sizes[0];
+      return { product: direct, size: primary?.size };
+    }
 
     const parsed = parseVariantRetailerId(retailerId);
     const product = parsed ? byId.get(parsed.productId) : undefined;
@@ -256,6 +269,7 @@ async function handleOrder(
     '[order:received]',
     `${items.length} lines`,
     `${resolved.filter((r) => r.size).length} already sized`,
+    resolved.map((r) => `${r.product.id}:${r.size ?? '?'}`).join(' '),
   );
 
   if (state.sessionId) await markCartSent(env, state.sessionId);
