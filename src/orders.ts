@@ -284,7 +284,20 @@ export async function createShopifyOrder(
   const order: Record<string, unknown> = {
     currency: 'INR',
     financialStatus: 'PAID',
-    sourceName: 'whatsapp-stylist',
+    /*
+     * The channel a merchant sees is the app's own name, not this.
+     *
+     * `sourceName` takes the handle of an order attribution definition
+     * registered by a published sales channel app — `youtube`, or
+     * `channel:amazon-us`. A custom app cannot register one, so an arbitrary
+     * string here is ignored and Shopify shows the app's name instead.
+     * Renaming the app is what changes the channel.
+     *
+     * `sourceIdentifier` is the field that does work: the order's id on the
+     * originating platform, which is the number the shopper was quoted in the
+     * chat. It makes an order findable from a WhatsApp conversation.
+     */
+    sourceIdentifier: input.sessionId,
     note,
     tags,
     phone: input.contact || `+${input.waId.replace(/\D/g, '')}`,
