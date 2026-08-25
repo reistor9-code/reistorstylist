@@ -64,6 +64,11 @@ CATEGORY_ARTWORK_ENABLED = "off"
 # actually sent.
 CATALOG_VARIANTS = "off"
 
+# Offer a discount code before checkout, validated against Shopify so the
+# amount charged and the amount on the order agree. Needs read_discounts on
+# the Shopify app. See src/coupons.ts.
+COUPONS = "on"
+
 # Ask for a delivery address before checkout, using WhatsApp's India address
 # form. Needs no entitlement — unlike payments — so the order reaches Shopify
 # fulfillable instead of tagged address-pending. "off" restores the old

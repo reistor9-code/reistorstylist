@@ -23,7 +23,7 @@ import {
   parseVariantRetailerId,
   productSku,
 } from './catalog';
-import { COPY } from './copy';
+import { COPY, fill, formatINR } from './copy';
 import {
   askCartPick,
   askCategory,
@@ -54,6 +54,7 @@ import { handleDashboard } from './dashboard/route';
 import { runJobs } from './jobs';
 import { handleRazorpayWebhook, razorpayStatus, sendRazorpayCheckout } from './razorpay';
 import { handleFastrrWebhook } from './fastrr';
+import { loadApplied, refusal, saveApplied, validateCoupon } from './coupons';
 import {
   askAddress,
   isComplete,
@@ -436,6 +437,26 @@ async function openCheckout(
     }
   }
 
+  /*
+   * The discount, after the address and before the money.
+   *
+   * Here rather than earlier because the basket is final by this point — a
+   * code with a minimum spend can be judged against a total that will not
+   * change, so "that code needs ₹3,000 or more" is true when it is said.
+   */
+  if (!askedAlready && (env.COUPONS || 'on').toLowerCase() === 'on') {
+    const already = await loadApplied(env, to);
+    if (!already) {
+      await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
+      state.step = 'coupon';
+      await sendButtons(env, to, COPY.couponAsk, [
+        { id: 'act:coupon', title: 'Apply a code' },
+        { id: 'act:nocoupon', title: 'No, continue' },
+      ]);
+      return;
+    }
+  }
+
   const provider = (env.CHECKOUT_PROVIDER || 'fastrr').toLowerCase();
 
   /*
@@ -602,6 +623,20 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
     case 'act:browse':
       await browseCategory(env, to, state, all);
       return;
+    case 'act:coupon':
+      state.step = 'coupon';
+      await sendText(env, to, COPY.couponPrompt);
+      return;
+    case 'act:nocoupon': {
+      // Straight past the discount, and past the address too — it is already
+      // saved by the time this button exists.
+      const raw = await env.STATE.get(`colines:${to}`);
+      const lines = raw ? JSON.parse(raw) : [];
+      await env.STATE.delete(`colines:${to}`);
+      if (lines.length) await openCheckout(env, to, state, all, lines, true);
+      else await sendText(env, to, COPY.addressSavedNoBag);
+      return;
+    }
     case 'act:paid':
       await confirmOrder(env, to, state);
       return;
@@ -705,6 +740,50 @@ async function handleText(env: Env, to: string, state: State, text: string): Pro
    * The carousel carries no menu of its own, so these keywords are the only
    * way to page or open the catalogue by hand. The rest runs off the buttons.
    */
+  /*
+   * A typed discount code.
+   *
+   * Read before the keyword shortcuts below, or a code like MORE or BROWSE
+   * would be swallowed by them and the shopper would be shown more looks
+   * instead of a discount.
+   */
+  if (state.step === 'coupon') {
+    const raw = await env.STATE.get(`colines:${to}`);
+    const lines = raw
+      ? (JSON.parse(raw) as { productId: string; title: string; size: string; priceINR: number }[])
+      : [];
+    const subtotal = lines.reduce((sum, l) => sum + l.priceINR, 0);
+
+    const result = await validateCoupon(env, text, subtotal, lines.length);
+
+    if (!result.ok) {
+      console.log('[coupon:refused]', text.trim(), result.reason);
+      await sendButtons(env, to, refusal(result.reason), [
+        { id: 'act:coupon', title: 'Try another' },
+        { id: 'act:nocoupon', title: 'Continue' },
+      ]);
+      return;
+    }
+
+    await saveApplied(env, to, result.coupon);
+    console.log('[coupon:applied]', result.coupon.code, `-₹${result.coupon.discountINR}`);
+
+    await sendText(
+      env,
+      to,
+      fill(COPY.couponApplied, {
+        code: result.coupon.code,
+        was: formatINR(subtotal),
+        now: formatINR(Math.max(1, subtotal - result.coupon.discountINR)),
+      }),
+    );
+
+    await env.STATE.delete(`colines:${to}`);
+    if (lines.length) await openCheckout(env, to, state, await getProducts(env), lines, true);
+    else await sendText(env, to, COPY.addressSavedNoBag);
+    return;
+  }
+
   const keyword = text.trim().toLowerCase();
   if (state.rankedIds.length) {
     if (/^(more|next)\b/.test(keyword)) {

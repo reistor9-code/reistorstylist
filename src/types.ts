@@ -113,6 +113,12 @@ export interface Env {
    * fulfillable. See src/address.ts.
    */
   ADDRESS_CAPTURE?: string;
+  /**
+   * "on" (default) offers a discount code before checkout, validated
+   * against Shopify. Needs read_discounts on the Shopify app; without it
+   * every code is refused. See src/coupons.ts.
+   */
+  COUPONS?: string;
   PICKER_MODE?: string;
   OCCASION_TEMPLATE?: string;
   CATEGORY_TEMPLATE?: string;
@@ -127,6 +133,8 @@ export type Step =
   | 'size'
   /** Waiting on the address form. Sits between sizing and checkout. */
   | 'address'
+  /** Waiting on a typed discount code. */
+  | 'coupon'
   | 'checkout'
   | 'done';
 

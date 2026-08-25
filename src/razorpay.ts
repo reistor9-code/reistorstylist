@@ -25,6 +25,7 @@ import { formatINR } from './copy';
 import { markCheckoutOpened, markOrdered, sendPurchaseEvent } from './analytics/capture';
 import { clearCart } from './cart';
 import { createShopifyOrder } from './orders';
+import { clearApplied, loadApplied } from './coupons';
 import { loadAddress } from './address';
 import { sendButtons, sendCtaUrl, sendText } from './whatsapp';
 
@@ -38,8 +39,10 @@ export interface PaymentSession {
   waId: string;
   /** Every garment being bought. One payment, one order, however many lines. */
   lines: { productId: string; title: string; size: string; priceINR: number }[];
-  /** The basket total, which is what Razorpay charges. */
+  /** What Razorpay charges — the basket less any discount. */
   priceINR: number;
+  /** The code applied, carried onto the Shopify order so the totals agree. */
+  coupon?: import('./coupons').Coupon;
   paymentLinkId?: string;
   createdAt: string;
   /** Set once a webhook has been acted on — the idempotency guard. */
@@ -168,7 +171,17 @@ export async function sendRazorpayCheckout(
   lines: { productId: string; title: string; size: string; priceINR: number }[],
 ): Promise<void> {
   const sessionId = crypto.randomUUID();
-  const total = lines.reduce((sum, l) => sum + l.priceINR, 0);
+  const subtotal = lines.reduce((sum, l) => sum + l.priceINR, 0);
+
+  /*
+   * The link charges what the shopper was quoted.
+   *
+   * The coupon is read here rather than passed in, so the discount lives in
+   * one place and the same value reaches Razorpay and Shopify. Floored at one
+   * rupee: a link for zero is refused with an error nobody can act on.
+   */
+  const coupon = (await loadApplied(env, to)) ?? undefined;
+  const total = coupon ? Math.max(1, subtotal - coupon.discountINR) : subtotal;
 
   const session: PaymentSession = {
     sessionId,
@@ -177,6 +190,7 @@ export async function sendRazorpayCheckout(
     waId: to,
     lines,
     priceINR: total,
+    coupon,
     createdAt: new Date().toISOString(),
   };
 
@@ -388,6 +402,7 @@ export async function handleRazorpayWebhook(env: Env, request: Request): Promise
     amountINR,
     paymentId: String(payment.id ?? entity.id ?? ''),
     paymentLinkId: session.paymentLinkId,
+    coupon: session.coupon,
     // Razorpay fills `void@razorpay.com` in when no email was collected.
     // Passing it on would create a Shopify customer for a fake address.
     email: /^void@razorpay/i.test(payment.email ?? '') ? undefined : payment.email || undefined,
@@ -407,6 +422,9 @@ export async function handleRazorpayWebhook(env: Env, request: Request): Promise
 
   // Everything past here ran on the first webhook already.
   if (alreadySettled) return new Response('OK', { status: 200 });
+
+  // The discount belonged to this basket; the next one starts at full price.
+  await clearApplied(env, session.waId);
 
   if (session.flowSessionId) await markOrdered(env, session.flowSessionId);
 

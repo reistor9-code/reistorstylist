@@ -10,6 +10,7 @@
 
 import type { Env } from './types';
 import { toShopifyAddress, type ShippingAddress } from './address';
+import { toOrderDiscount, type Coupon } from './coupons';
 import { getProducts, shopifyFetch, shopifyGraphql } from './catalog';
 import { formatINR } from './copy';
 import { LIMITS, sendButtons, sendList, sendText } from './whatsapp';
@@ -166,6 +167,8 @@ export interface OrderLine {
 export interface OrderPushInput {
   /** Collected in the chat with an address_message. See src/address.ts. */
   shipping?: ShippingAddress;
+  /** Validated against Shopify, so the order and the gateway agree. */
+  coupon?: Coupon;
   waId: string;
   sessionId: string;
   /** Every garment in the basket. One order, however many lines. */
@@ -272,6 +275,7 @@ export async function createShopifyOrder(
     hasAddress
       ? 'Shipping address collected in the chat.'
       : 'Shipping address NOT collected. Follow up with the customer before fulfilling.',
+    input.coupon ? `Discount code ${input.coupon.code} applied.` : null,
     input.test ? 'TEST ORDER — created while Razorpay was in test mode. Safe to delete.' : null,
   ]
     .filter(Boolean)
@@ -287,6 +291,12 @@ export async function createShopifyOrder(
     ...(input.shipping
       ? { shippingAddress: toShopifyAddress(input.shipping, `+${input.waId.replace(/\D/g, '')}`) }
       : {}),
+    /*
+     * The same code the shopper was quoted, so Shopify computes the discount
+     * itself rather than being handed a total it cannot explain. Verified
+     * against OrderCreateOrderInput — this takes a typed object, not a string.
+     */
+    ...(input.coupon ? { discountCode: toOrderDiscount(input.coupon) } : {}),
     lineItems,
     transactions: [
       {
