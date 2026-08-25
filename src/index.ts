@@ -54,7 +54,7 @@ import { handleDashboard } from './dashboard/route';
 import { runJobs } from './jobs';
 import { handleRazorpayWebhook, razorpayStatus, sendRazorpayCheckout } from './razorpay';
 import { handleFastrrWebhook } from './fastrr';
-import { loadApplied, refusal, saveApplied, validateCoupon } from './coupons';
+import { clearApplied, loadApplied, refusal, saveApplied, validateCoupon } from './coupons';
 import {
   askAddress,
   isComplete,
@@ -466,16 +466,50 @@ ${summarise(known)}`, [
    * change, so "that code needs ₹3,000 or more" is true when it is said.
    */
   if (!done.coupon && (env.COUPONS || 'on').toLowerCase() === 'on') {
+    await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
+    state.step = 'coupon';
+
+    const subtotal = lines.reduce((sum, l) => sum + l.priceINR, 0);
     const already = await loadApplied(env, to);
-    if (!already) {
-      await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
-      state.step = 'coupon';
-      await sendButtons(env, to, COPY.couponAsk, [
-        { id: 'act:coupon', title: 'Apply a code' },
-        { id: 'act:nocoupon', title: 'No, continue' },
-      ]);
-      return;
+
+    /*
+     * A code already applied is re-priced against THIS basket, not carried
+     * over at the amount it was worth on the last one. Ten per cent of a
+     * 3,000 bag is not ten per cent of a 2,100 bag, and a stale figure would
+     * quote one number and charge another.
+     *
+     * It is also re-validated: a code can expire, or stop meeting its minimum
+     * spend, between one basket and the next.
+     */
+    if (already) {
+      const recheck = await validateCoupon(env, already.code, subtotal, lines.length);
+      if (recheck.ok) {
+        await saveApplied(env, to, recheck.coupon);
+        await sendButtons(
+          env,
+          to,
+          fill(COPY.couponApplied, {
+            code: recheck.coupon.code,
+            was: formatINR(subtotal),
+            now: formatINR(Math.max(1, subtotal - recheck.coupon.discountINR)),
+          }),
+          [
+            { id: 'act:nocoupon', title: 'Continue' },
+            { id: 'act:coupon', title: 'Use another code' },
+          ],
+        );
+        return;
+      }
+      // No longer valid on this basket — drop it and ask afresh.
+      console.log('[coupon:dropped]', already.code, recheck.ok ? '' : recheck.reason);
+      await clearApplied(env, to);
     }
+
+    await sendButtons(env, to, COPY.couponAsk, [
+      { id: 'act:coupon', title: 'Apply a code' },
+      { id: 'act:nocoupon', title: 'No, continue' },
+    ]);
+    return;
   }
 
   const provider = (env.CHECKOUT_PROVIDER || 'fastrr').toLowerCase();
@@ -659,6 +693,8 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
       return;
     }
     case 'act:coupon':
+      // Cleared first, so "use another code" replaces rather than stacking.
+      await clearApplied(env, to);
       state.step = 'coupon';
       await sendText(env, to, COPY.couponPrompt);
       return;
