@@ -322,7 +322,11 @@ async function handleOrder(
 
   // Greeted once per basket, and not at all when the same one arrives twice —
   // the shopper is mid-way through sizing and has not just walked in.
-  if (!resent) await sendText(env, to, COPY.cartReceived);
+  if (!resent) {
+    // Only promise a size question when one is actually coming.
+    const needsSize = cart.some((l) => !l.size);
+    await sendText(env, to, needsSize ? COPY.cartReceived : COPY.cartReceivedSized);
+  }
   await sizeNextLine(env, to, state, all);
 }
 

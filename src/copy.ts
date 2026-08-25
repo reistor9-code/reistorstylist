@@ -45,7 +45,11 @@ export const COPY = {
   // carousel. {placeholders} are filled by fill().
   categoryMore: 'The rest of the {category} edit for {occasion}.',
   categoryExhausted: 'That is every {category} piece in stock for {occasion} right now.',
+  // Two greetings, because the cart may or may not need anything from the
+  // shopper. Sizes are chosen on WhatsApp's own product page now, so most
+  // baskets arrive complete and asking for one would be a step backwards.
   cartReceived: 'Your bag is here. Pick a size and I will open checkout.',
+  cartReceivedSized: 'Your bag is here. Let me take the delivery details.',
   cartPick: 'Which piece would you like to size first?',
   cartPickNext: '{done} of {total} sized. Which piece next?',
   cartEmpty: 'Nothing came through in that bag. Tap a card above to open a look.',
