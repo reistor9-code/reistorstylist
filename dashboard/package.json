@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "deploy": "npm run build && wrangler pages deploy dist --project-name reistor-dashboard"
+    "deploy": "npm run build && echo \"Built to dist/ — Nginx serves it from /srv/stylist/dashboard/dist\""
   },
   "dependencies": {
     "class-variance-authority": "^0.7.1",
