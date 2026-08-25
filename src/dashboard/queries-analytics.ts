@@ -546,16 +546,30 @@ export async function conversations(
  * strips the text and leaves the event, so the shape of a conversation
  * survives after its words are gone.
  */
+/**
+ * One shopper's messages, all of them.
+ *
+ * There was a cap of 200 here, and it was the wrong shape of protection. The
+ * point of a transcript is to answer "what went wrong in this chat", and the
+ * answer is usually near the end — which is exactly what a cap on an ascending
+ * sort throws away. Worse, it did so silently: the header read "200 messages"
+ * whether that was the whole conversation or the first third of it.
+ *
+ * Unbounded is affordable because the query is already narrow. It is one
+ * wa_id, and message text is stripped after 90 days, so what comes back is a
+ * single shopper's recent chat rather than anything resembling the table.
+ */
 export async function transcript(
   cfg: SupabaseConfig,
   waId: string,
-  limit = 200,
+  limit?: number,
 ): Promise<Message[]> {
   const res = await select<Record<string, unknown>[]>(
     cfg,
     'events',
     `wa_id=eq.${encodeURIComponent(waId)}&event_type=eq.message` +
-      `&select=direction,body,message_type,payload_id,flow_step,ts&order=ts.asc&limit=${limit}`,
+      `&select=direction,body,message_type,payload_id,flow_step,ts&order=ts.asc` +
+      (limit ? `&limit=${limit}` : ''),
   );
   return (res.data ?? []).map((r) => ({
     direction: str(r.direction),
