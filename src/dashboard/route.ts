@@ -31,6 +31,20 @@ export interface DashboardEnv {
   PHONE_NUMBER_ID?: string;
 }
 
+/** Thirty days, so a laptop that is closed over a holiday still works. */
+const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+
+/** The remembered token, if this browser has been here before. */
+function cookieToken(request: Request): string | null {
+  const header = request.headers.get('cookie');
+  if (!header) return null;
+  for (const part of header.split(';')) {
+    const [name, ...rest] = part.trim().split('=');
+    if (name === 'rdash') return decodeURIComponent(rest.join('='));
+  }
+  return null;
+}
+
 /** Constant-time compare, so the token cannot be guessed a character at a time. */
 function tokenMatches(supplied: string | null, expected: string): boolean {
   if (!supplied || supplied.length !== expected.length) return false;
@@ -104,15 +118,38 @@ export async function handleDashboard(
   }
 
   const url = new URL(request.url);
+  const fromQuery = url.searchParams.get('token');
   const supplied =
-    url.searchParams.get('token') ??
+    fromQuery ??
     request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
-    null;
+    cookieToken(request);
 
   // The null check is what narrows `supplied` to a string for renderShell
   // below; tokenMatches already rejects null, but that does not narrow.
   if (!supplied || !tokenMatches(supplied, env.DASHBOARD_TOKEN)) {
     return new Response('Forbidden', { status: 403 });
+  }
+
+  /*
+   * Seen once in the URL, remembered in a cookie, then dropped from the URL.
+   *
+   * A token in a query string is written to Nginx's access log in plaintext,
+   * kept in browser history, and pasted by hand every time. The cookie is
+   * HttpOnly and Secure, so it is not readable by script and never leaves an
+   * encrypted connection — and the redirect means the bare link works from
+   * then on, which is the point.
+   */
+  if (fromQuery) {
+    const clean = new URL(url);
+    clean.searchParams.delete('token');
+    return new Response(null, {
+      status: 302,
+      headers: {
+        location: clean.pathname + (clean.search || ''),
+        'set-cookie': `rdash=${encodeURIComponent(supplied)}; Path=/dashboard; HttpOnly; Secure; SameSite=Lax; Max-Age=${COOKIE_MAX_AGE}`,
+        'cache-control': 'no-store',
+      },
+    });
   }
 
   const days = Math.min(365, Math.max(1, Number(url.searchParams.get('days')) || 30));
