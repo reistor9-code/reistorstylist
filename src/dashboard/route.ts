@@ -23,16 +23,24 @@ import { defaultRange, loadDashboard, markCalled, type DashboardData } from './q
 import { loadAnalytics, transcript, type AnalyticsData } from './queries-analytics.js';
 import { renderPage } from './page.js';
 import { humaniseTranscript } from './transcript-text.js';
+import { DEFAULT_TTL_SECONDS, sign, verify } from './jwt.js';
 
 export interface DashboardEnv {
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_KEY?: string;
   DASHBOARD_TOKEN?: string;
+  /** Signs dashboard sessions. Falls back to DASHBOARD_TOKEN when unset. */
+  DASHBOARD_JWT_SECRET?: string;
   PHONE_NUMBER_ID?: string;
 }
 
-/** Thirty days, so a laptop that is closed over a holiday still works. */
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30;
+/** JSON, with caching off — every one of these carries account data. */
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body, null, 2), {
+    status,
+    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+  });
+}
 
 /** The remembered token, if this browser has been here before. */
 function cookieToken(request: Request): string | null {
@@ -106,7 +114,11 @@ export async function handleDashboard(
    * is what makes that easy to reason about.
    */
   const isCallbackWrite = path === '/dashboard/api/callback' && request.method === 'POST';
-  if (request.method !== 'GET' && !isCallbackWrite) {
+  // Exchanging the shared secret for a session token is the other POST. It is
+  // named here rather than inside the check below so the write surface stays
+  // readable: two paths accept anything but GET, and they are both listed.
+  const isAuth = path === '/dashboard/auth' && request.method === 'POST';
+  if (request.method !== 'GET' && !isCallbackWrite && !isAuth) {
     return new Response('Method not allowed', { status: 405 });
   }
 
@@ -118,17 +130,61 @@ export async function handleDashboard(
   }
 
   const url = new URL(request.url);
-  const fromQuery = url.searchParams.get('token');
-  const supplied =
-    fromQuery ??
-    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ??
-    cookieToken(request);
+  const signingSecret = env.DASHBOARD_JWT_SECRET?.trim() || env.DASHBOARD_TOKEN;
 
-  // The null check is what narrows `supplied` to a string for renderShell
-  // below; tokenMatches already rejects null, but that does not narrow.
-  if (!supplied || !tokenMatches(supplied, env.DASHBOARD_TOKEN)) {
-    return new Response('Forbidden', { status: 403 });
+  /*
+   * Exchange the shared secret for a session token.
+   *
+   *   POST /dashboard/auth  { "token": "<DASHBOARD_TOKEN>" }
+   *   → { "token": "<jwt>", "expiresIn": 43200 }
+   *
+   * The only place the shared secret is accepted as a credential. Everything
+   * else takes the JWT, so a token lifted from a browser or a proxy log is
+   * worth hours rather than forever.
+   */
+  if (path === '/dashboard/auth') {
+    if (request.method !== 'POST') {
+      return json({ error: 'POST only' }, 405);
+    }
+    let body: { token?: string };
+    try {
+      body = (await request.json()) as { token?: string };
+    } catch {
+      return json({ error: 'Expected a JSON body with a token field.' }, 400);
+    }
+    if (!body.token || !tokenMatches(body.token, env.DASHBOARD_TOKEN)) {
+      console.log('[dashboard:auth-refused]');
+      return json({ error: 'Forbidden' }, 403);
+    }
+    const issued = await sign(signingSecret, 'dashboard');
+    console.log('[dashboard:auth-issued]');
+    return json({ token: issued, tokenType: 'Bearer', expiresIn: DEFAULT_TTL_SECONDS });
   }
+
+  const fromQuery = url.searchParams.get('token');
+  const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') ?? null;
+  const supplied = fromQuery ?? bearer ?? cookieToken(request);
+
+  if (!supplied) return new Response('Forbidden', { status: 403 });
+
+  /*
+   * Two credentials are accepted, and they are not equivalent.
+   *
+   * A JWT is the normal one — issued by /dashboard/auth, expiring on its own.
+   * The shared secret is accepted too, because it is what someone pastes into
+   * a link the first time; that path immediately swaps it for a JWT below,
+   * so the long-lived value never becomes what rides on every request.
+   */
+  let authorised = false;
+  if (supplied.split('.').length === 3) {
+    const result = await verify(signingSecret, supplied);
+    authorised = result.ok;
+    if (!result.ok) console.log('[dashboard:jwt-refused]', result.reason);
+  } else {
+    authorised = tokenMatches(supplied, env.DASHBOARD_TOKEN);
+  }
+
+  if (!authorised) return new Response('Forbidden', { status: 403 });
 
   /*
    * Seen once in the URL, remembered in a cookie, then dropped from the URL.
@@ -140,13 +196,16 @@ export async function handleDashboard(
    * then on, which is the point.
    */
   if (fromQuery) {
+    // A session token, not the shared secret — so the cookie expires by
+    // itself and a copy of it cannot be used to mint more.
+    const session = await sign(signingSecret, 'dashboard');
     const clean = new URL(url);
     clean.searchParams.delete('token');
     return new Response(null, {
       status: 302,
       headers: {
         location: clean.pathname + (clean.search || ''),
-        'set-cookie': `rdash=${encodeURIComponent(supplied)}; Path=/dashboard; HttpOnly; Secure; SameSite=Lax; Max-Age=${COOKIE_MAX_AGE}`,
+        'set-cookie': `rdash=${encodeURIComponent(session)}; Path=/dashboard; HttpOnly; Secure; SameSite=Lax; Max-Age=${DEFAULT_TTL_SECONDS}`,
         'cache-control': 'no-store',
       },
     });
