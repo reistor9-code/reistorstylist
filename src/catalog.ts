@@ -195,6 +195,17 @@ export async function getProducts(env: Env): Promise<Product[]> {
   if (cached) return JSON.parse(cached) as Product[];
 
   const mapped: Product[] = [];
+  /*
+   * Ids already taken, because a product must never appear twice.
+   *
+   * Shopify's cursor paging can hand back the same product on two pages when
+   * the store changes mid-walk, and one duplicate multiplies: every size is
+   * emitted twice, and Meta answers "Duplicate retailer_id in batch api call"
+   * and drops the whole second set. Deduping here keeps that out of the
+   * catalog, the ranking and the carousels at once.
+   */
+  const seen = new Set<string>();
+  let duplicates = 0;
   let skipped = 0;
   let pageInfo: string | null = null;
 
@@ -214,8 +225,16 @@ export async function getProducts(env: Env): Promise<Product[]> {
     const body = (await res.json()) as { products?: ShopifyProduct[] };
     for (const p of body.products ?? []) {
       const product = mapShopifyProduct(p);
-      if (product) mapped.push(product);
-      else skipped++;
+      if (!product) {
+        skipped++;
+        continue;
+      }
+      if (seen.has(product.id)) {
+        duplicates++;
+        continue;
+      }
+      seen.add(product.id);
+      mapped.push(product);
     }
 
     const link = res.headers.get('link') ?? '';
@@ -229,7 +248,12 @@ export async function getProducts(env: Env): Promise<Product[]> {
     return catalog as Product[];
   }
 
-  console.log('[shopify:loaded]', `mapped=${mapped.length}`, `skipped=${skipped}`);
+  console.log(
+    '[shopify:loaded]',
+    `mapped=${mapped.length}`,
+    `skipped=${skipped}`,
+    `duplicates=${duplicates}`,
+  );
   await env.STATE.put(SHOPIFY_CACHE_KEY, JSON.stringify(mapped), { expirationTtl: 600 });
   return mapped;
 }
