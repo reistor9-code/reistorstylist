@@ -136,7 +136,6 @@ export interface Env {
    * order is created PENDING with no transaction — see src/cod.ts.
    */
   COD?: string;
-  PICKER_MODE?: string;
   OCCASION_TEMPLATE?: string;
   CATEGORY_TEMPLATE?: string;
   TEMPLATE_LANGUAGE?: string;

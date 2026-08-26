@@ -87,7 +87,6 @@ ADDRESS_CAPTURE = "on"
 #              whenever a send is rejected
 # Set to "list" while templates are pending approval or the account has no
 # payment method, so the flow reaches checkout either way.
-PICKER_MODE = "list"
 
 # Occasion / category pickers are approved carousel Marketing templates,
 # billed at ~₹0.86 per delivered message (Meta's test number does not bill).

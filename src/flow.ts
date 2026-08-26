@@ -84,23 +84,17 @@ export async function clearState(env: Env, waId: string): Promise<void> {
  * ------------------------------------------------------------------ */
 
 /**
- * Whether to skip the carousel templates entirely.
- *
- * The pickers are Marketing templates, so they need approval and they bill on
- * every send. A list message is a service message: free inside the 24-hour
- * window, no approval, no billing. Set PICKER_MODE=list to use lists while
- * templates are pending — or permanently, if the photography is not worth the
- * per-send cost.
- */
-const listPickers = (env: Env) => (env.PICKER_MODE || 'template').toLowerCase() === 'list';
-
-/**
  * The occasion picker as a list.
  *
- * Also the fallback when the template send is rejected — a paused template, an
- * unapproved one, marketing opted out, or no payment method on the account.
- * Rows carry the same `occ:` ids the carousel buttons do, so a tap lands in the
- * same handler and the flow does not know the difference.
+ * The fallback, and only that. PICKER_MODE used to let a deployment choose
+ * lists over carousels while the templates were pending approval; both are
+ * approved now, so the choice is gone and the carousel is what shoppers see.
+ *
+ * This still earns its place, because approval is not the only thing that
+ * rejects a send. A Marketing template that gets Paused on quality rejects
+ * too, and that can happen on any day without warning. Rows carry the same
+ * `occ:` ids the carousel buttons do, so a tap lands in the same handler and
+ * the flow does not know the difference.
  */
 async function occasionList(env: Env, to: string): Promise<boolean> {
   return sendList(env, to, {
@@ -117,12 +111,6 @@ async function occasionList(env: Env, to: string): Promise<boolean> {
 
 export async function askOccasion(env: Env, to: string, state: State): Promise<void> {
   state.step = 'occasion';
-
-  if (listPickers(env)) {
-    if (await occasionList(env, to)) return;
-    await sendText(env, to, COPY.occasionTypePrompt);
-    return;
-  }
 
   const sent = await sendCarouselTemplate(
     env,
@@ -182,12 +170,6 @@ export async function askCategory(env: Env, to: string, state: State): Promise<v
       button: 'Choose',
       rows: categoryRows(),
     });
-
-  if (listPickers(env)) {
-    if (await categoryList()) return;
-    await sendText(env, to, COPY.categoryTypePrompt);
-    return;
-  }
 
   const base = env.CATEGORY_TEMPLATE || 'category_picker';
   // Artwork varies by occasion where it exists; see CATEGORY_IMAGES.
