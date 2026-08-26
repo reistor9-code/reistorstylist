@@ -39,8 +39,9 @@ import {
   startGoogleSignIn,
   type GoogleAuthEnv,
 } from './auth-google.js';
+import { listTeam, signIn, signUp, updateTeamMember, type AccountsEnv } from './accounts.js';
 
-export interface DashboardEnv extends GoogleAuthEnv {
+export interface DashboardEnv extends GoogleAuthEnv, AccountsEnv {
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_KEY?: string;
   DASHBOARD_TOKEN?: string;
@@ -141,7 +142,18 @@ export async function handleDashboard(
    * its own once there is more than one role.
    */
   const isAnalyse = path === '/dashboard/api/analyse' && request.method === 'POST';
-  if (request.method !== 'GET' && !isCallbackWrite && !isAuth && !isAnalyse) {
+  const isSignUp = path === '/dashboard/auth/signup' && request.method === 'POST';
+  const isSignIn = path === '/dashboard/auth/login' && request.method === 'POST';
+  const isTeamWrite = path === '/dashboard/api/team' && request.method === 'POST';
+  if (
+    request.method !== 'GET' &&
+    !isCallbackWrite &&
+    !isAuth &&
+    !isAnalyse &&
+    !isSignUp &&
+    !isSignIn &&
+    !isTeamWrite
+  ) {
     return new Response('Method not allowed', { status: 405 });
   }
 
@@ -199,6 +211,18 @@ export async function handleDashboard(
    * happily because it is not null — so the cookie was never consulted and
    * every call after the first visit was refused.
    */
+  /*
+   * Signing up and signing in, before the credential gate — these are the
+   * routes somebody without a session has to be able to reach.
+   */
+  if (isSignUp || isSignIn) {
+    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
+      return json({ error: 'Accounts are not configured on this server.' }, 503);
+    }
+    const store: SupabaseConfig = { url: env.SUPABASE_URL, serviceKey: env.SUPABASE_SERVICE_KEY };
+    return isSignUp ? signUp(env, store, request) : signIn(env, store, request);
+  }
+
   if (path === CALLBACK_PATH) {
     if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
       return new Response('Supabase is not configured, so accounts cannot be checked.', {
@@ -324,6 +348,16 @@ export async function handleDashboard(
       headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
     });
   }
+  /*
+   * The team list. Admin only for the same reason as the rest: it is a list of
+   * real people, and approving an account is the one action that grants
+   * somebody else access to every customer in the database.
+   */
+  if (path === '/dashboard/api/team') {
+    if (role !== 'admin') return json({ error: 'Admins only.' }, 403);
+    return isTeamWrite ? updateTeamMember(cfg, who, request) : listTeam(cfg);
+  }
+
   /*
    * Defaults to the number this instance is configured with, so the figures
    * shown match the bot that is running. `phone=all` opts into everything,

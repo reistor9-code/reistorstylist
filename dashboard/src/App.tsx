@@ -13,6 +13,8 @@ import {
   Wallet,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsNavItem } from '@/components/ui/tabs';
+import { SignIn } from '@/SignIn';
+import { Team } from '@/tabs/Team';
 import { Button } from '@/components/ui/button';
 import { fetchDashboard, NotSignedIn, type DashboardData } from '@/lib/api';
 import { ActionQueue } from '@/tabs/ActionQueue';
@@ -25,6 +27,7 @@ import { Products } from '@/tabs/Products';
 import { Revenue } from '@/tabs/Revenue';
 import { Risk } from '@/tabs/Risk';
 import { Timing } from '@/tabs/Timing';
+import { Users } from 'lucide-react';
 
 const WINDOWS = [7, 30, 90, 365];
 
@@ -53,25 +56,8 @@ const SECTIONS = [
   },
 ] as const;
 
-const GROUPS = ['Today', 'Performance', 'Catalogue'] as const;
+const GROUPS = ['Today', 'Performance', 'Catalogue', 'Admin'] as const;
 
-/**
- * What went wrong, in words rather than a query string.
- *
- * `pending` is the one that matters: it is not a failure, it is the system
- * working. Somebody signed in with a real Google account and is waiting to be
- * let in, and telling them "access denied" would send them to support instead
- * of to whoever approves accounts.
- */
-const SIGN_IN_PROBLEMS: Record<string, string> = {
-  pending: 'Your account is waiting for approval. Ask an admin to enable it.',
-  blocked: 'This account has been blocked.',
-  unverified: 'That Google account has not verified its email address.',
-  cancelled: 'Sign-in was cancelled.',
-  expired: 'That sign-in link expired. Try again.',
-  incomplete: 'Google did not send back everything needed. Try again.',
-  'google-failed': 'Google could not confirm the sign-in. Try again.',
-};
 
 export default function App() {
   const [days, setDays] = React.useState(30);
@@ -100,34 +86,12 @@ export default function App() {
 
   /*
    * The sign-in screen. Deliberately the whole page and nothing else: there is
-   * no data to show behind it, and a dashboard that renders empty tiles under a
-   * modal invites somebody to wonder whether the numbers are real zeroes.
+   * no data behind it, and a dashboard rendering empty tiles under a modal
+   * invites somebody to wonder whether the zeroes are real.
    */
   if (signIn) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
-        <span className="grid h-10 w-10 place-items-center rounded bg-accent text-base font-bold text-white">
-          R
-        </span>
-        <h1 className="mt-5 text-lg font-semibold">Stylist Control Room</h1>
-        <p className="mt-2 text-sm text-subtle">{signIn.message}</p>
-
-        {signIn.reason ? (
-          <p className="mt-4 rounded border border-border bg-card p-3 text-sm">
-            {SIGN_IN_PROBLEMS[signIn.reason] ?? 'Sign-in did not complete. Try again.'}
-          </p>
-        ) : null}
-
-        {signIn.signInUrl ? (
-          <Button className="mt-6 self-start" onClick={() => (window.location.href = signIn.signInUrl!)}>
-            Continue with Google
-          </Button>
-        ) : (
-          <p className="mt-6 text-sm text-subtle">
-            Google sign-in is not configured on this server.
-          </p>
-        )}
-      </main>
+      <SignIn message={signIn.message} googleUrl={signIn.signInUrl} reason={signIn.reason} />
     );
   }
 
@@ -152,6 +116,19 @@ export default function App() {
   }
 
   const a = data.analytics;
+  const me = data.viewer;
+  const isAdmin = me?.role === 'admin';
+  /*
+   * The rail is built per render rather than declared once, because Team only
+   * exists for an admin — and a tab a viewer can see but not open is worse
+   * than one that is not there.
+   */
+  const sections = isAdmin
+    ? [
+        ...SECTIONS,
+        { value: 'team', label: 'Team', icon: <Users size={16} />, group: 'Admin' as const },
+      ]
+    : SECTIONS;
   const overdue = data.callbacks.filter((c) => c.overdue).length;
   const badges: Record<string, number> = {
     action: overdue,
@@ -197,7 +174,7 @@ export default function App() {
                   {group}
                 </div>
                 <div>
-                  {SECTIONS.filter((s) => s.group === group).map((s) => (
+                  {sections.filter((s) => s.group === group).map((s) => (
                     <TabsNavItem
                       key={s.value}
                       value={s.value}
@@ -211,6 +188,31 @@ export default function App() {
               </div>
             ))}
           </nav>
+
+          {/*
+            Who is reading, and the way out. At the foot of the rail rather than
+            in the header because it is the least-used control on the page and
+            the one somebody looks for deliberately — but it has to be somewhere
+            visible, or a shared laptop stays signed in as whoever came first.
+          */}
+          {me ? (
+            <div className="border-t border-sidebar-border px-5 py-3">
+              <div className="truncate text-xs text-sidebar-text-hover" title={me.email}>
+                {me.email}
+              </div>
+              <div className="mt-0.5 flex items-center justify-between">
+                <span className="text-[11px] uppercase tracking-wider text-sidebar-text">
+                  {me.role}
+                </span>
+                <a
+                  href="/dashboard/auth/signout"
+                  className="text-[11px] text-sidebar-text underline underline-offset-2 hover:text-sidebar-text-active"
+                >
+                  Sign out
+                </a>
+              </div>
+            </div>
+          ) : null}
 
           <div className="border-t border-sidebar-border px-5 py-4 text-[11px] leading-relaxed text-sidebar-text">
             Generated {new Date(data.generatedAt).toLocaleTimeString('en-IN')}
@@ -316,6 +318,11 @@ export default function App() {
             <TabsContent value="conversations">
               <Conversations chats={a.conversations} />
             </TabsContent>
+            {isAdmin ? (
+              <TabsContent value="team">
+                <Team me={me?.email ?? ''} />
+              </TabsContent>
+            ) : null}
           </div>
 
           <footer className="border-t border-border px-6 py-4 text-xs text-subtle">

@@ -29,9 +29,17 @@ CREATE TABLE IF NOT EXISTS dashboard_users (
   status         TEXT NOT NULL DEFAULT 'pending'
                  CHECK (status IN ('pending', 'active', 'blocked')),
 
+  -- PBKDF2-HMAC-SHA256, self-describing: pbkdf2$<iterations>$<salt>$<hash>.
+  -- NULL for anyone who only ever signs in with Google, which is most people
+  -- and is the better door. Never leaves the server — listTeam strips it.
+  password_hash  TEXT,
+
   created_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
   last_login_at  TIMESTAMPTZ
 );
+
+-- Already have the table from an earlier run? This adds the column.
+ALTER TABLE dashboard_users ADD COLUMN IF NOT EXISTS password_hash TEXT;
 
 -- Who is waiting, oldest first. The list a human works through.
 CREATE INDEX IF NOT EXISTS dashboard_users_pending_idx

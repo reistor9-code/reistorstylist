@@ -333,3 +333,55 @@ export async function markCalled(id: number): Promise<void> {
   });
   if (!res.ok) throw new Error(`Could not save: ${res.status}`);
 }
+
+
+/* ------------------------------------------------------------------ *
+ * Accounts
+ * ------------------------------------------------------------------ */
+
+export interface TeamMember {
+  email: string;
+  name: string | null;
+  picture: string | null;
+  role: 'admin' | 'viewer';
+  status: 'pending' | 'active' | 'blocked';
+  created_at: string;
+  last_login_at: string | null;
+}
+
+/** Throws the server's own message, which is written to be shown. */
+async function post(path: string, body: unknown): Promise<any> {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json().catch(() => ({}))) as { error?: string };
+  if (!res.ok) throw new Error(data.error ?? `That did not work (${res.status}).`);
+  return data;
+}
+
+export function signUp(name: string, email: string, password: string) {
+  return post('/dashboard/auth/signup', { name, email, password }) as Promise<{
+    ok: true;
+    status: 'pending' | 'active' | 'blocked';
+  }>;
+}
+
+export function signIn(email: string, password: string) {
+  return post('/dashboard/auth/login', { email, password }) as Promise<{ ok: true }>;
+}
+
+export async function fetchTeam(): Promise<TeamMember[]> {
+  const res = await fetch('/dashboard/api/team', { headers: { accept: 'application/json' } });
+  if (!res.ok) throw new Error(`The team list answered ${res.status}.`);
+  const body = (await res.json()) as { users?: TeamMember[] };
+  return body.users ?? [];
+}
+
+export function updateMember(
+  email: string,
+  patch: { status?: TeamMember['status']; role?: TeamMember['role'] },
+) {
+  return post('/dashboard/api/team', { email, ...patch });
+}
