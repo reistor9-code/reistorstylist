@@ -107,6 +107,11 @@ export interface Env {
   ASSET_VERSION?: string;
   /** Rupees added to a cash-on-delivery order. Default 180. See cod.ts. */
   COD_FEE_INR?: string;
+  /** Google OAuth client for dashboard sign-in. See dashboard/auth-google.ts. */
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  /** Comma-separated emails that are admins from their first sign-in. */
+  DASHBOARD_ADMINS?: string;
   /** Answers questions about the dashboard. See dashboard/analyse.ts. */
   ANTHROPIC_API_KEY?: string;
   CATALOG_VARIANTS?: string;

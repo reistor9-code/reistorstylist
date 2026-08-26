@@ -37,6 +37,9 @@ export const CONFIG_KEYS = [
   // Dashboard
   'DASHBOARD_TOKEN',
   'ANTHROPIC_API_KEY',
+  'GOOGLE_CLIENT_ID',
+  'GOOGLE_CLIENT_SECRET',
+  'DASHBOARD_ADMINS',
 
   // Deployment
   'PORT',
@@ -101,6 +104,17 @@ export function configWarnings(config: Config): string[] {
   // would send somebody hunting for a feature that is not there.
   if (!config.ANTHROPIC_API_KEY) {
     warn.push('ANTHROPIC_API_KEY unset — /dashboard/api/analyse will refuse every request.');
+  }
+  if (!config.GOOGLE_CLIENT_ID || !config.GOOGLE_CLIENT_SECRET) {
+    warn.push(
+      'GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET unset — the dashboard has no sign-in, ' +
+        'so the shared DASHBOARD_TOKEN is the only way in.',
+    );
+  } else if (!config.DASHBOARD_ADMINS) {
+    warn.push(
+      'DASHBOARD_ADMINS unset — every Google sign-in lands as pending and nobody can ' +
+        'approve them from inside the dashboard. Set it to your own email.',
+    );
   }
   if (!config.DASHBOARD_TOKEN) {
     warn.push('DASHBOARD_TOKEN unset — the dashboard route refuses every request.');

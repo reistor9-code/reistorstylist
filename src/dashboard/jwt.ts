@@ -39,9 +39,23 @@ async function key(secret: string): Promise<CryptoKey> {
   );
 }
 
+/** admin sees everything; viewer sees aggregates and no personal data. */
+export type Role = 'admin' | 'viewer';
+
 export interface Claims {
-  /** Who the token is for. One value today; a person's name when there are several. */
+  /** Who the token is for — an email once somebody has signed in with Google. */
   sub: string;
+  /**
+   * What they may do.
+   *
+   * Carried in the token rather than looked up per request, so authorisation
+   * costs nothing and cannot fail open when the database is unreachable. The
+   * cost is that a revoked role survives until the token expires, which is why
+   * the TTL is a working day and not a week.
+   */
+  role?: Role;
+  /** Display only. */
+  name?: string;
   /** Seconds since the epoch. */
   iat: number;
   exp: number;
@@ -54,11 +68,14 @@ export async function sign(
   secret: string,
   sub: string,
   ttlSeconds = DEFAULT_TTL_SECONDS,
+  extra: { role?: Role; name?: string } = {},
 ): Promise<string> {
   const now = Math.floor(Date.now() / 1000);
   const header = b64url(encoder.encode(JSON.stringify({ alg: 'HS256', typ: 'JWT' })));
   const payload = b64url(
-    encoder.encode(JSON.stringify({ sub, iat: now, exp: now + ttlSeconds } satisfies Claims)),
+    encoder.encode(
+      JSON.stringify({ sub, ...extra, iat: now, exp: now + ttlSeconds } satisfies Claims),
+    ),
   );
   const body = `${header}.${payload}`;
   const mac = await crypto.subtle.sign('HMAC', await key(secret), encoder.encode(body));

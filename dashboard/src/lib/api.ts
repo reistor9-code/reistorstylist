@@ -145,6 +145,27 @@ export interface AnalyticsData {
   errors: string[];
 }
 
+/**
+ * Not signed in — distinct from "not allowed", because only one of them has a
+ * button. A 403 means the account exists and may not see this; a 401 means
+ * there is no account yet and Google is one click away.
+ */
+export class NotSignedIn extends Error {
+  constructor(
+    message: string,
+    readonly signInUrl: string | null,
+    readonly reason: string | null = null,
+  ) {
+    super(message);
+    this.name = 'NotSignedIn';
+  }
+}
+
+export interface Viewer {
+  email: string;
+  role: 'admin' | 'viewer';
+}
+
 export interface DashboardData {
   range: { from: string; to: string; phoneNumberId?: string };
   generatedAt: string;
@@ -166,6 +187,8 @@ export interface DashboardData {
   };
   revenue: { orders: number; revenueINR: number; averageOrderINR: number; costPerOrder: number | null };
   analytics: AnalyticsData;
+  /** Who the server thinks is reading. Absent on an older deploy. */
+  viewer?: Viewer;
 }
 
 /**
@@ -216,7 +239,21 @@ export async function fetchDashboard(days: number, phone: string): Promise<Dashb
 
   const res = await fetch(`/dashboard/api?${qs}`, { headers: { accept: 'application/json' } });
 
-  if (res.status === 403) throw new Error('The token in this link is not accepted.');
+  /*
+   * The sign-in case, handled before anything else. The server answers 401
+   * with the URL to send them to, so this file never has to know how sign-in
+   * is implemented — only that it is somewhere.
+   */
+  if (res.status === 401) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; signInUrl?: string };
+    throw new NotSignedIn(
+      body.error ?? 'Sign in to see the dashboard.',
+      body.signInUrl ?? null,
+      new URLSearchParams(window.location.search).get('error'),
+    );
+  }
+
+  if (res.status === 403) throw new Error('This account does not have access to the dashboard.');
   if (res.status === 503) throw new Error(await res.text());
   if (!res.ok) throw new Error(`The dashboard API answered ${res.status}.`);
 
@@ -244,6 +281,7 @@ export async function fetchDashboard(days: number, phone: string): Promise<Dashb
     health: body.health ?? { qualityRating: null, messagingTier: null, capturedAt: null, templates: [] },
     revenue: body.revenue ?? { orders: 0, revenueINR: 0, averageOrderINR: 0, costPerOrder: null },
     analytics: mergeAnalytics(body.analytics),
+    viewer: body.viewer,
   };
 }
 

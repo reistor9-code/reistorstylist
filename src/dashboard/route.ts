@@ -31,8 +31,16 @@ import { loadAnalytics, transcript, type AnalyticsData } from './queries-analyti
 import { humaniseTranscript } from './transcript-text.js';
 import { DEFAULT_TTL_SECONDS, sign, verify } from './jwt.js';
 import { analyse } from './analyse.js';
+import {
+  CALLBACK_PATH,
+  completeGoogleSignIn,
+  googleConfigured,
+  signOut,
+  startGoogleSignIn,
+  type GoogleAuthEnv,
+} from './auth-google.js';
 
-export interface DashboardEnv {
+export interface DashboardEnv extends GoogleAuthEnv {
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_KEY?: string;
   DASHBOARD_TOKEN?: string;
@@ -137,6 +145,13 @@ export async function handleDashboard(
     return new Response('Method not allowed', { status: 405 });
   }
 
+  /*
+   * Signing in, before the credential check — these are the routes somebody
+   * without a credential has to be able to reach.
+   */
+  if (path === '/dashboard/auth/google') return startGoogleSignIn(env, request);
+  if (path === '/dashboard/auth/signout') return signOut(env, request);
+
   if (!env.DASHBOARD_TOKEN) {
     return new Response(
       'DASHBOARD_TOKEN is not set. Set it before exposing this route.',
@@ -184,11 +199,37 @@ export async function handleDashboard(
    * happily because it is not null — so the cookie was never consulted and
    * every call after the first visit was refused.
    */
+  if (path === CALLBACK_PATH) {
+    if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
+      return new Response('Supabase is not configured, so accounts cannot be checked.', {
+        status: 503,
+      });
+    }
+    return completeGoogleSignIn(env, request, {
+      url: env.SUPABASE_URL,
+      serviceKey: env.SUPABASE_SERVICE_KEY,
+    });
+  }
+
   const fromQuery = url.searchParams.get('token') || null;
   const bearer = request.headers.get('authorization')?.replace(/^Bearer\s+/i, '') || null;
   const supplied = fromQuery ?? bearer ?? cookieToken(request);
 
-  if (!supplied) return new Response('Forbidden', { status: 403 });
+  /*
+   * 401 with a sign-in URL, not a bare 403.
+   *
+   * The app has to be able to tell "you are not signed in" from "you may not
+   * see this", because the first one has a button and the second one does not.
+   */
+  if (!supplied) {
+    return json(
+      {
+        error: 'Sign in to see the dashboard.',
+        signInUrl: googleConfigured(env) ? '/dashboard/auth/google' : null,
+      },
+      401,
+    );
+  }
 
   /*
    * Two credentials are accepted, and they are not equivalent.
@@ -199,10 +240,23 @@ export async function handleDashboard(
    * so the long-lived value never becomes what rides on every request.
    */
   let authorised = false;
+  /*
+   * The shared secret is a person nobody can name, so it keeps the keys to
+   * everything — it is the break-glass credential and the one curl uses. A
+   * Google session carries whatever role the database gave it.
+   */
+  let role: 'admin' | 'viewer' = 'admin';
+  let who = 'shared-token';
+
   if (supplied.split('.').length === 3) {
     const result = await verify(signingSecret, supplied);
     authorised = result.ok;
-    if (!result.ok) console.log('[dashboard:jwt-refused]', result.reason);
+    if (result.ok) {
+      role = result.claims.role ?? 'admin';
+      who = result.claims.sub;
+    } else {
+      console.log('[dashboard:jwt-refused]', result.reason);
+    }
   } else {
     authorised = tokenMatches(supplied, env.DASHBOARD_TOKEN);
   }
@@ -300,6 +354,19 @@ export async function handleDashboard(
    * report. Sending every transcript to the browser to render one of them
    * would push far more personal data than the reader asked for.
    */
+  /*
+   * Admin only, both of them.
+   *
+   * A transcript is one named person's conversation, and the analysis endpoint
+   * sends the whole dataset — phone numbers included — to a third party and
+   * spends money doing it. Everything else on this route is an aggregate, which
+   * is what a viewer is for.
+   */
+  if ((isAnalyse || path === '/dashboard/api/transcript') && role !== 'admin') {
+    console.log('[dashboard:forbidden]', who, path);
+    return json({ error: 'Your account does not have access to this.' }, 403);
+  }
+
   if (path === '/dashboard/api/transcript') {
     const waId = (url.searchParams.get('wa') ?? '').replace(/\D/g, '');
     if (!waId) {
@@ -367,7 +434,10 @@ export async function handleDashboard(
         `rdash=${encodeURIComponent(session)}; Path=/dashboard; HttpOnly; Secure; SameSite=Lax; Max-Age=${DEFAULT_TTL_SECONDS}`;
     }
 
-    return new Response(JSON.stringify({ ...data, analytics }, null, 2), { status: 200, headers });
+    return new Response(
+      JSON.stringify({ ...data, analytics, viewer: { email: who, role } }, null, 2),
+      { status: 200, headers },
+    );
   }
 
   /*

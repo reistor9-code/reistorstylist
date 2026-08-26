@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsNavItem } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
-import { fetchDashboard, type DashboardData } from '@/lib/api';
+import { fetchDashboard, NotSignedIn, type DashboardData } from '@/lib/api';
 import { ActionQueue } from '@/tabs/ActionQueue';
 import { Acquisition } from '@/tabs/Acquisition';
 import { Carts } from '@/tabs/Carts';
@@ -55,11 +55,30 @@ const SECTIONS = [
 
 const GROUPS = ['Today', 'Performance', 'Catalogue'] as const;
 
+/**
+ * What went wrong, in words rather than a query string.
+ *
+ * `pending` is the one that matters: it is not a failure, it is the system
+ * working. Somebody signed in with a real Google account and is waiting to be
+ * let in, and telling them "access denied" would send them to support instead
+ * of to whoever approves accounts.
+ */
+const SIGN_IN_PROBLEMS: Record<string, string> = {
+  pending: 'Your account is waiting for approval. Ask an admin to enable it.',
+  blocked: 'This account has been blocked.',
+  unverified: 'That Google account has not verified its email address.',
+  cancelled: 'Sign-in was cancelled.',
+  expired: 'That sign-in link expired. Try again.',
+  incomplete: 'Google did not send back everything needed. Try again.',
+  'google-failed': 'Google could not confirm the sign-in. Try again.',
+};
+
 export default function App() {
   const [days, setDays] = React.useState(30);
   const [phone, setPhone] = React.useState('');
   const [data, setData] = React.useState<DashboardData | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [signIn, setSignIn] = React.useState<NotSignedIn | null>(null);
   const [loading, setLoading] = React.useState(true);
 
   const load = React.useCallback(() => {
@@ -68,12 +87,49 @@ export default function App() {
       .then((d) => {
         setData(d);
         setError(null);
+        setSignIn(null);
       })
-      .catch((e: Error) => setError(e.message))
+      .catch((e: Error) => {
+        if (e instanceof NotSignedIn) setSignIn(e);
+        else setError(e.message);
+      })
       .finally(() => setLoading(false));
   }, [days, phone]);
 
   React.useEffect(load, [load]);
+
+  /*
+   * The sign-in screen. Deliberately the whole page and nothing else: there is
+   * no data to show behind it, and a dashboard that renders empty tiles under a
+   * modal invites somebody to wonder whether the numbers are real zeroes.
+   */
+  if (signIn) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center p-6">
+        <span className="grid h-10 w-10 place-items-center rounded bg-accent text-base font-bold text-white">
+          R
+        </span>
+        <h1 className="mt-5 text-lg font-semibold">Stylist Control Room</h1>
+        <p className="mt-2 text-sm text-subtle">{signIn.message}</p>
+
+        {signIn.reason ? (
+          <p className="mt-4 rounded border border-border bg-card p-3 text-sm">
+            {SIGN_IN_PROBLEMS[signIn.reason] ?? 'Sign-in did not complete. Try again.'}
+          </p>
+        ) : null}
+
+        {signIn.signInUrl ? (
+          <Button className="mt-6 self-start" onClick={() => (window.location.href = signIn.signInUrl!)}>
+            Continue with Google
+          </Button>
+        ) : (
+          <p className="mt-6 text-sm text-subtle">
+            Google sign-in is not configured on this server.
+          </p>
+        )}
+      </main>
+    );
+  }
 
   if (error) {
     return (
