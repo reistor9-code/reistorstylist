@@ -13,7 +13,7 @@
  */
 
 import type { CartLine, Env, State } from './types';
-import { clearCart, loadCart, saveCart } from './cart';
+import { CART_TTL_SECONDS, clearCart, loadCart, saveCart } from './cart';
 import { handleAdmin } from './admin';
 import type { Product } from './catalog';
 import {
@@ -461,7 +461,9 @@ async function openCheckout(
   if (!done.address && (env.ADDRESS_CAPTURE || 'on').toLowerCase() === 'on') {
     const known = await loadAddress(env, to);
     // Stashed either way, so whichever button comes back resumes this basket.
-    await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
+    await env.STATE.put(`colines:${to}`, JSON.stringify(lines), {
+      expirationTtl: CART_TTL_SECONDS,
+    });
 
     /*
      * A returning shopper confirms rather than retypes — but is shown what
@@ -491,7 +493,9 @@ ${summarise(known)}`, [
    * change, so "that code needs ₹3,000 or more" is true when it is said.
    */
   if (!done.coupon && (env.COUPONS || 'on').toLowerCase() === 'on') {
-    await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
+    await env.STATE.put(`colines:${to}`, JSON.stringify(lines), {
+      expirationTtl: CART_TTL_SECONDS,
+    });
     state.step = 'coupon';
 
     const subtotal = lines.reduce((sum, l) => sum + l.priceINR, 0);
@@ -546,7 +550,9 @@ ${summarise(known)}`, [
    * the order on a button press and collects nothing.
    */
   if (!done.payment && (env.COD || 'on').toLowerCase() === 'on') {
-    await env.STATE.put(`colines:${to}`, JSON.stringify(lines), { expirationTtl: 3600 });
+    await env.STATE.put(`colines:${to}`, JSON.stringify(lines), {
+      expirationTtl: CART_TTL_SECONDS,
+    });
     await sendButtons(env, to, COPY.payHow, [
       { id: 'act:pay_online', title: 'Pay online' },
       { id: 'act:pay_cod', title: 'Cash on delivery' },

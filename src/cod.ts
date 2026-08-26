@@ -18,12 +18,20 @@ import { sendButtons } from './whatsapp';
 import { createShopifyOrder, type OrderLine } from './orders';
 import { loadAddress } from './address';
 import { clearApplied, loadApplied } from './coupons';
-import { clearCart } from './cart';
+import { CART_TTL_SECONDS, clearCart } from './cart';
 import { markOrdered } from './analytics/capture';
 
-/** The basket, held between the Confirm Order card and the tap that follows. */
+/**
+ * The basket, held between the Confirm Order card and the tap that follows.
+ *
+ * It lives exactly as long as the cart does. It used to expire after an hour,
+ * which meant the card outlived its own hold by twenty-three: a shopper who
+ * put their phone down and came back to confirm was told the bag had expired
+ * while the garment was still in the cart, priced, sized and waiting. The
+ * offer and the basket now die together, or not at all.
+ */
 const pendingKey = (waId: string) => `cod:${waId}`;
-const PENDING_TTL_SECONDS = 60 * 60;
+const PENDING_TTL_SECONDS = CART_TTL_SECONDS;
 
 /**
  * What cash on delivery costs to run, passed on.

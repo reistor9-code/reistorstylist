@@ -16,7 +16,15 @@
 
 import type { CartLine, Env } from './types';
 
-const CART_TTL_SECONDS = 60 * 60 * 24;
+/**
+ * A day, and exported because the basket is held in more than one place.
+ *
+ * Checkout parks copies of it — `colines` across each question, `cod` between
+ * the Confirm Order card and the tap on it — and a copy that dies before the
+ * basket it came from turns a live offer into "that bag has expired" while the
+ * garment is still sitting in the cart.
+ */
+export const CART_TTL_SECONDS = 60 * 60 * 24;
 const cartKey = (waId: string) => `cart:${waId}`;
 
 export async function loadCart(env: Env, waId: string): Promise<CartLine[]> {
