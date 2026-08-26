@@ -385,6 +385,29 @@ ${summarise(address)}`);
   await resumeCheckout(env, to, state);
 }
 
+type CheckoutLine = { productId: string; title: string; size: string; priceINR: number };
+
+/**
+ * The basket parked while checkout asks a question, without consuming it.
+ *
+ * Falls back to the Cash on Delivery hold, because choosing COD moves the
+ * lines from `colines` to `cod` — and a shopper who then decides to pay online
+ * after all still has a basket, just not where the online path was looking.
+ */
+async function parkedLines(env: Env, to: string): Promise<CheckoutLine[]> {
+  for (const key of [`colines:${to}`, `cod:${to}`]) {
+    const raw = await env.STATE.get(key);
+    if (!raw) continue;
+    try {
+      const parsed = JSON.parse(raw) as CheckoutLine[];
+      if (Array.isArray(parsed) && parsed.length) return parsed;
+    } catch {
+      // A malformed hold is the same as no hold.
+    }
+  }
+  return [];
+}
+
 async function resumeCheckout(env: Env, to: string, state: State): Promise<void> {
   const raw = await env.STATE.get(`colines:${to}`);
   const lines = raw ? (JSON.parse(raw) as { productId: string; title: string; size: string; priceINR: number }[]) : [];
@@ -697,10 +720,23 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
     case 'act:browse':
       await browseCategory(env, to, state, all);
       return;
+    /*
+     * Pay online and Cash on delivery sit on one card, and a shopper is
+     * allowed to change their mind.
+     *
+     * Both used to consume the parked basket on the way past — read `colines`,
+     * delete it, continue. So whichever button was tapped first emptied the
+     * shelf, and the other one found nothing and answered "Address saved. Tap
+     * a look to start a new bag." to somebody who was standing at the till
+     * with a garment chosen.
+     *
+     * Neither deletes now. The basket is released when an order is actually
+     * placed — clearCart() takes `colines` and `cod` with it — or when the
+     * hour's TTL runs out. Tapping back and forth between the two just re-asks
+     * the question, which is what the card looks like it does.
+     */
     case 'act:pay_online': {
-      const raw = await env.STATE.get(`colines:${to}`);
-      const lines = raw ? JSON.parse(raw) : [];
-      await env.STATE.delete(`colines:${to}`);
+      const lines = await parkedLines(env, to);
       if (lines.length) {
         await openCheckout(env, to, state, all, lines, {
           address: true,
@@ -711,9 +747,7 @@ async function handleReply(env: Env, to: string, state: State, replyId: string):
       return;
     }
     case 'act:pay_cod': {
-      const raw = await env.STATE.get(`colines:${to}`);
-      const lines = raw ? JSON.parse(raw) : [];
-      await env.STATE.delete(`colines:${to}`);
+      const lines = await parkedLines(env, to);
       if (lines.length) await sendCodConfirm(env, to, state, lines);
       else await sendText(env, to, COPY.addressSavedNoBag);
       return;

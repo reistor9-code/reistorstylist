@@ -39,5 +39,22 @@ export async function saveCart(env: Env, waId: string, lines: CartLine[]): Promi
 
 /** Called at checkout and on any full restart — Main Menu, End Chat, a greeting. */
 export async function clearCart(env: Env, waId: string): Promise<void> {
-  await env.STATE.delete(cartKey(waId));
+  await Promise.all([
+    env.STATE.delete(cartKey(waId)),
+    /*
+     * The two parked copies of the same basket go with it.
+     *
+     * Checkout asks three questions — address, then a discount code, then how
+     * to pay — and parks the lines under `colines` across each one, because a
+     * shopper answering a question is not sending a cart. `cod` is the same
+     * basket again, held between the Confirm Order card and the tap on it.
+     *
+     * Left behind, they outlive the order that consumed them: a shopper who
+     * paid and then hit an old Pay online button would be handed a payment
+     * card for a basket they already bought. Clearing them here means the
+     * basket dies in one place, whichever route the order took.
+     */
+    env.STATE.delete(`colines:${waId}`),
+    env.STATE.delete(`cod:${waId}`),
+  ]);
 }
