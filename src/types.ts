@@ -103,6 +103,8 @@ export interface Env {
    * host to cut Pages out. See assetUrl().
    */
   ASSET_BASE?: string;
+  /** Bump to force Meta to re-fetch card artwork. See assetUrl(). */
+  ASSET_VERSION?: string;
   CATALOG_VARIANTS?: string;
   CATEGORY_ARTWORK_ENABLED?: string;
   /**

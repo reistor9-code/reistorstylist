@@ -474,7 +474,22 @@ export function categoryImage(
 export function assetUrl(env: Env, path: string): string {
   if (/^https?:\/\//i.test(path)) return path;
   const base = (env.ASSET_BASE || 'https://reistor-dashboard.pages.dev').replace(/\/+$/, '');
-  return `${base}${path.startsWith('/') ? path : `/${path}`}`;
+  const url = `${base}${path.startsWith('/') ? path : `/${path}`}`;
+
+  /*
+   * ?v=… so a replaced image is actually seen.
+   *
+   * Meta fetches every carousel card image once and then reuses its copy,
+   * keyed on the URL. There is no purge API. So overwriting the file on disk
+   * changes nothing a shopper sees — the artwork can be correct on the server,
+   * verified byte for byte, and still arrive as the picture it replaced.
+   *
+   * Bumping ASSET_VERSION makes every card a URL Meta has never fetched, which
+   * is the only reliable way to force it. It also drops through to Nginx's
+   * `expires` header, so browsers and any proxy in between refresh with it.
+   */
+  const version = env.ASSET_VERSION?.trim();
+  return version ? `${url}?v=${encodeURIComponent(version)}` : url;
 }
 
 /** The occasion card's artwork, resolved against ASSET_BASE. */
