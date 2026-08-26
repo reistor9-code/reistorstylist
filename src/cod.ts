@@ -13,7 +13,7 @@
  */
 
 import type { Env, State } from './types';
-import { COPY, formatINR } from './copy';
+import { COPY, fill, formatINR } from './copy';
 import { sendButtons } from './whatsapp';
 import { createShopifyOrder, type OrderLine } from './orders';
 import { loadAddress } from './address';
@@ -24,6 +24,25 @@ import { markOrdered } from './analytics/capture';
 /** The basket, held between the Confirm Order card and the tap that follows. */
 const pendingKey = (waId: string) => `cod:${waId}`;
 const PENDING_TTL_SECONDS = 60 * 60;
+
+/**
+ * What cash on delivery costs to run, passed on.
+ *
+ * COD is most of Indian fashion ecommerce and it is also where the returns
+ * are: a parcel refused at the door is paid for twice and sells nothing. The
+ * fee covers part of that, and quoted beside the saving rather than on its own
+ * it moves the shoppers who do not mind either way onto the path that actually
+ * completes.
+ *
+ * Configurable because it is a commercial number, not an engineering one.
+ * Zero, or anything unparseable, switches it off entirely — card line and all.
+ */
+export function codFee(env: Env): number {
+  const raw = env.COD_FEE_INR?.trim();
+  if (raw === undefined || raw === '') return 180;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? Math.round(n) : 0;
+}
 
 /**
  * The same card the online path sends, with a button instead of a link.
@@ -39,7 +58,9 @@ export async function sendCodConfirm(
 ): Promise<void> {
   const subtotal = lines.reduce((sum, l) => sum + l.priceINR, 0);
   const coupon = await loadApplied(env, to);
-  const total = coupon ? Math.max(1, subtotal - coupon.discountINR) : subtotal;
+  const discounted = coupon ? Math.max(1, subtotal - coupon.discountINR) : subtotal;
+  const fee = codFee(env);
+  const total = discounted + fee;
 
   await env.STATE.put(pendingKey(to), JSON.stringify(lines), {
     expirationTtl: PENDING_TTL_SECONDS,
@@ -49,17 +70,35 @@ export async function sendCodConfirm(
     .map((l) => `${l.title}\nSize ${l.size} · ${formatINR(l.priceINR)}`)
     .join('\n\n');
 
+  /*
+   * The fee is itemised rather than folded into the total. A number that
+   * appears without explanation is where a shopper stops trusting the figure,
+   * and this one is far larger than the rounding they might let pass.
+   */
   const summary: string[] = [];
   if (coupon) summary.push(`${coupon.code}  −${formatINR(coupon.discountINR)}`);
+  if (fee > 0) summary.push(`${COPY.codFeeLabel}  +${formatINR(fee)}`);
   summary.push(`${COPY.codPayable} ${formatINR(total)}`);
 
+  /*
+   * The nudge is a line of text, not a fourth button.
+   *
+   * "Pay online" is already live on the card above this one, and since the
+   * parked basket is no longer consumed on the way past it still works after
+   * a shopper has looked at COD. Pointing at that button costs nothing. A
+   * button here would instead leave a payment link and a Confirm Order card
+   * armed at the same time for one basket — two orders, one garment.
+   */
+  const tail =
+    fee > 0 ? `${fill(COPY.codSave, { fee: formatINR(fee) })}\n\n${COPY.codHint}` : COPY.codHint;
+
   state.step = 'checkout';
-  await sendButtons(env, to, `${itemised}\n\n${summary.join('\n')}\n\n${COPY.codHint}`, [
+  await sendButtons(env, to, `${itemised}\n\n${summary.join('\n')}\n\n${tail}`, [
     { id: 'act:cod_confirm', title: 'Confirm Order' },
     { id: 'act:main_menu', title: 'Main Menu' },
   ]);
 
-  console.log('[cod:offered]', to, `${lines.length} lines`, `₹${total}`);
+  console.log('[cod:offered]', to, `${lines.length} lines`, `₹${total}`, `fee=${fee}`);
 }
 
 /**
@@ -84,7 +123,14 @@ export async function placeCodOrder(env: Env, to: string, state: State): Promise
   const lines = JSON.parse(raw) as OrderLine[];
   const subtotal = lines.reduce((sum, l) => sum + l.priceINR, 0);
   const coupon = (await loadApplied(env, to)) ?? undefined;
-  const total = coupon ? Math.max(1, subtotal - coupon.discountINR) : subtotal;
+  /*
+   * Read from the same function the card read it from, rather than carried
+   * across on the pending record. The two taps are minutes apart, so the worst
+   * a changed rate can do is disagree by that much — and the order, the note
+   * and the shipping line always agree with each other.
+   */
+  const fee = codFee(env);
+  const total = (coupon ? Math.max(1, subtotal - coupon.discountINR) : subtotal) + fee;
   const shipping = (await loadAddress(env, to)) ?? undefined;
 
   const push = await createShopifyOrder(env, {
@@ -95,6 +141,7 @@ export async function placeCodOrder(env: Env, to: string, state: State): Promise
     shipping,
     coupon,
     cod: true,
+    codFeeINR: fee,
     // Same rule as the online path: a test-mode deployment must not move
     // real stock, whichever way the shopper chose to pay.
     test: !env.RAZORPAY_KEY_ID?.startsWith('rzp_live'),
@@ -133,5 +180,5 @@ export async function placeCodOrder(env: Env, to: string, state: State): Promise
     { id: 'act:end', title: 'End Chat' },
   ]);
 
-  console.log('[cod:placed]', to, push.orderName ?? '(no name)', `₹${total}`);
+  console.log('[cod:placed]', to, push.orderName ?? '(no name)', `₹${total}`, `fee=${fee}`);
 }

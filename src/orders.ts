@@ -177,6 +177,14 @@ export interface OrderPushInput {
    * tells the packer a debt has been settled that has not.
    */
   cod?: boolean;
+  /**
+   * The cash-on-delivery surcharge, in rupees.
+   *
+   * Carried onto the order as a shipping line so Shopify's own total matches
+   * the figure the shopper agreed to in the chat. A fee shown on the card and
+   * missing from the order is a courier collecting the wrong amount.
+   */
+  codFeeINR?: number;
   waId: string;
   sessionId: string;
   /** Every garment in the basket. One order, however many lines. */
@@ -287,6 +295,9 @@ export async function createShopifyOrder(
       ? 'Shipping address collected in the chat.'
       : 'Shipping address NOT collected. Follow up with the customer before fulfilling.',
     input.coupon ? `Discount code ${input.coupon.code} applied.` : null,
+    input.codFeeINR && input.codFeeINR > 0
+      ? `Includes a cash-on-delivery fee of Rs ${input.codFeeINR}.`
+      : null,
     input.test ? 'TEST ORDER — created while Razorpay was in test mode. Safe to delete.' : null,
   ]
     .filter(Boolean)
@@ -328,6 +339,27 @@ export async function createShopifyOrder(
      * against OrderCreateOrderInput — this takes a typed object, not a string.
      */
     ...(input.coupon ? { discountCode: toOrderDiscount(input.coupon) } : {}),
+    /*
+     * The COD fee, as a shipping line.
+     *
+     * Shopify has no "surcharge" concept on orderCreate; a shipping line is
+     * the field that adds money to an order without pretending to be a
+     * garment. As its own line it stays visible on the invoice and in reports,
+     * rather than being buried by inflating a product price — and it is
+     * refunded separately if the parcel comes back.
+     */
+    ...(input.codFeeINR && input.codFeeINR > 0
+      ? {
+          shippingLines: [
+            {
+              title: 'Cash on delivery fee',
+              priceSet: {
+                shopMoney: { amount: input.codFeeINR.toFixed(2), currencyCode: 'INR' },
+              },
+            },
+          ],
+        }
+      : {}),
     lineItems,
     ...(input.cod
       ? {}

@@ -68,6 +68,8 @@ CATALOG_VARIANTS = "off"
 # Shopify as PENDING with no transaction — the courier collects at the door,
 # so marking it paid would corrupt the day's takings. See src/cod.ts.
 COD = "on"
+# Rupees added to a cash-on-delivery order. 0 switches the fee off entirely.
+COD_FEE_INR = "180"
 
 # Offer a discount code before checkout, validated against Shopify so the
 # amount charged and the amount on the order agree. Needs read_discounts on

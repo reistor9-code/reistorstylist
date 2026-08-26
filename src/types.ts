@@ -105,6 +105,8 @@ export interface Env {
   ASSET_BASE?: string;
   /** Bump to force Meta to re-fetch card artwork. See assetUrl(). */
   ASSET_VERSION?: string;
+  /** Rupees added to a cash-on-delivery order. Default 180. See cod.ts. */
+  COD_FEE_INR?: string;
   /** Answers questions about the dashboard. See dashboard/analyse.ts. */
   ANTHROPIC_API_KEY?: string;
   CATALOG_VARIANTS?: string;

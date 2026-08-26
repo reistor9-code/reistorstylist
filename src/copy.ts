@@ -61,6 +61,9 @@ export const COPY = {
   addressConfirm: 'Delivering to:',
   payHow: 'How would you like to pay?',
   codHint: 'Confirm and we will pack it. Pay the courier when it arrives.',
+  codFeeLabel: 'Cash on delivery fee',
+  /* The saving, not the surcharge. Same number, and one of them gets read. */
+  codSave: 'Pay online instead and save {fee}.',
   codPayable: 'Pay on delivery',
   codPlaced: 'Order confirmed. Pay the courier when it arrives.',
   codExpired: 'That bag has expired. Tap a look to start again.',
