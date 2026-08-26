@@ -822,6 +822,25 @@ export async function syncCatalogItems(
         // Per size, which is the gain: a sold-out size is unpickable on the
         // product page rather than filtered out afterwards.
         availability: size.stock > 0 ? 'in stock' : 'out of stock',
+        /*
+         * Whole-garment stock, not this size's.
+         *
+         * `availability` does not hide anything — Meta keeps an out-of-stock
+         * item in the catalog and renders it greyed with the label. The flow
+         * never shows those, but the Catalog button opens Meta's own browser,
+         * which does not go through the flow, so a shopper who taps it sees a
+         * wall of things they cannot buy.
+         *
+         * `staging` keeps the item in the catalog and off every shopping
+         * surface. The id and its history survive, so a restock republishes
+         * it on the next sync rather than rebuilding it.
+         *
+         * Judged per product because a dress with only M gone must stay
+         * published — otherwise one sold-out size would take the garment down
+         * along with its size selector. Only a garment with nothing left in
+         * any size is staged, and every size of it goes together.
+         */
+        visibility: isInStock(p) ? 'published' : 'staging',
         condition: 'new',
         brand: 'Reistor',
         /* What makes the sizes one product with a selector. */
