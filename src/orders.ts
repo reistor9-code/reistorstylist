@@ -257,11 +257,21 @@ export async function createShopifyOrder(
     // would multiply the order by the number of garments in it.
     const linePrice = { shopMoney: { amount: line.priceINR.toFixed(2), currencyCode: 'INR' } };
 
+    /*
+     * requiresShipping on both branches, not just the fallback.
+     *
+     * orderCreate does not inherit it from the variant — omitted, the line
+     * comes out false and Shopify prints "Shipping not required" on an order
+     * for a garment. That is not cosmetic: it means no shipping label, and
+     * anything downstream reading the flag, a 3PL or Shiprocket, skips the
+     * parcel. Everything sold here is clothing, so it always ships.
+     */
     return variantId
       ? {
           variantId: `gid://shopify/ProductVariant/${variantId}`,
           quantity: 1,
           priceSet: linePrice,
+          requiresShipping: true,
           properties: [{ name: 'Size', value: line.size }],
         }
       : {
