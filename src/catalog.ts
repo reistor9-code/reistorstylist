@@ -40,7 +40,46 @@ export interface Product {
    * Optional so the bundled products.json fallback stays valid.
    */
   imageUrls?: string[];
+  /**
+   * The Shopify description, as plain text.
+   *
+   * Optional: the bundled products.json fallback has none, and a product whose
+   * description is empty in Shopify falls back to the generated line rather
+   * than shipping a blank field to Meta.
+   */
+  description?: string;
   productUrl: string;
+}
+
+/**
+ * Shopify's body_html as something Meta will accept.
+ *
+ * Catalog descriptions are plain text — markup is not rendered, it is shown.
+ * Block-level tags become spaces rather than vanishing, so "…hem.</p><p>Made
+ * from…" does not read as "hem.Made from".
+ *
+ * Entities are decoded because Shopify's editor writes them freely, and
+ * "Reistor&#39;s" on a product page is worse than no description at all.
+ */
+export function plainText(html: string | undefined): string {
+  if (!html) return '';
+  return html
+    // Anything that renders as a break becomes whitespace before tags go.
+    .replace(/<\s*(br|\/p|\/div|\/li|\/h[1-6]|\/tr)\s*\/?\s*>/gi, ' ')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)))
+    .replace(/&quot;/gi, '"')
+    .replace(/&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    // Last, or a decoded &amp;lt; would turn into a tag that is not one.
+    .replace(/&amp;/gi, '&')
+    .replace(/\s+/g, ' ')
+    .trim()
+    // Meta rejects anything past 9999 characters for the whole field.
+    .slice(0, 9999);
 }
 
 /**
@@ -170,6 +209,7 @@ export function mapShopifyProduct(p: ShopifyProduct): Product | null {
     category,
     fabric,
     attributes: p.product_type || category,
+    description: plainText(p.body_html) || undefined,
     priceINR: Math.round(price),
     sizes,
     imageUrl: p.images?.[0]?.src ?? '',
@@ -804,7 +844,12 @@ export async function syncCatalogItems(
         id,
         // Identical across the group, or Meta shows them as separate products.
         title: p.title,
-        description: `${cap(p.fabric)}, ${p.attributes}.`,
+        /*
+         * Shopify's own copy, which is what the brand actually wrote. The
+         * generated line stays as the fallback for a product with an empty
+         * description, so the field is never blank.
+         */
+        description: p.description || `${cap(p.fabric)}, ${p.attributes}.`,
         link: p.productUrl,
         // Collections are product sets filtered on a field, so the category
         // has to exist on the item itself.
