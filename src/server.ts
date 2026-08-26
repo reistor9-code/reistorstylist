@@ -16,6 +16,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import worker from './index';
 import type { Env } from './types';
 import { connectRedis } from './platform/kv-redis';
+import { KvStore, MirroredStore, SupabaseStore } from './platform/store';
 import { configFromProcess, configWarnings, missingRequired } from './platform/config';
 
 const PORT = Number(process.env.PORT ?? 8080);
@@ -98,7 +99,31 @@ async function main(): Promise<void> {
 
   const redisUrl = process.env.REDIS_URL ?? 'redis://127.0.0.1:6379';
   const { kv } = await connectRedis(redisUrl);
-  const env = readEnv(kv as unknown as Env['STATE']);
+
+  /*
+   * Redis answers, Supabase remembers.
+   *
+   * Reads stay in memory on this machine, because several of them happen per
+   * inbound message and a network round trip on each is felt in how quickly
+   * the bot replies. Writes go to both, so state survives a Redis flush, an
+   * eviction or a rebuilt server — and so the one genuinely sensitive key,
+   * `addr:` with a real name and address on it, lives somewhere encrypted at
+   * rest and backed up rather than only in plaintext on a disk.
+   *
+   * Without Supabase configured this is Redis alone, exactly as before. The
+   * mirror is an addition, never a dependency.
+   */
+  const url = process.env.SUPABASE_URL?.trim();
+  const serviceKey = process.env.SUPABASE_SERVICE_KEY?.trim();
+
+  const store =
+    url && serviceKey
+      ? new MirroredStore(new KvStore(kv), new SupabaseStore({ url, serviceKey }))
+      : new KvStore(kv);
+
+  console.log(url && serviceKey ? '[store] redis, mirrored to supabase' : '[store] redis only');
+
+  const env = readEnv(store as unknown as Env['STATE']);
 
   const server = createServer((req, res) => {
     /*

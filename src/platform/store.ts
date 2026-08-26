@@ -181,3 +181,84 @@ export function getStore(env: StoreEnv): Store {
   console.log('[store:memory] no SUPABASE_URL or KV binding — state will not survive restarts');
   return new MemoryStore();
 }
+
+/* ------------------------------------------------------------------ *
+ * Both at once
+ * ------------------------------------------------------------------ */
+
+/**
+ * Redis in front, Supabase behind, every write going to both.
+ *
+ * Redis answers reads because it is in the same machine and in memory —
+ * several state reads happen per inbound message, and a network round trip on
+ * each one is felt in how fast the bot replies. Supabase gets the same write
+ * so the data survives the thing Redis cannot survive: a flush, an eviction,
+ * a rebuilt server. It is also encrypted at rest and backed up, which matters
+ * most for `addr:` — real names, addresses and phone numbers that otherwise
+ * live only in plaintext on a disk.
+ *
+ * No duplicates arise. The `kv` table has `key` as its primary key and the
+ * write is an upsert on it, so a second write to `state:9198…` updates that
+ * one row. The guarantee is the schema's, not this class's.
+ *
+ * A miss is a miss. Falling back to Supabase whenever Redis returned null
+ * would put a network round trip on every legitimate absence — a new shopper,
+ * an unseen message id — which is most of them. Supabase is consulted only
+ * when Redis actually fails, which is the case where it holds something Redis
+ * cannot answer for.
+ */
+export class MirroredStore implements Store {
+  constructor(
+    private fast: Store,
+    private durable: Store,
+  ) {}
+
+  async get(key: string): Promise<string | null> {
+    try {
+      return await this.fast.get(key);
+    } catch (err) {
+      /*
+       * Redis is down, so the copy earns its keep. Logged every time rather
+       * than swallowed — a bot quietly running on the slow path is something
+       * you want to know about before the day it matters.
+       */
+      console.log('[store:redis-read-failed]', key, String(err));
+      return this.durable.get(key);
+    }
+  }
+
+  async put(key: string, value: string, options?: PutOptions): Promise<void> {
+    /*
+     * Concurrent, so the pair costs what the slower one costs rather than
+     * both added together. Redis is awaited for real; a failed mirror is
+     * logged and swallowed, because losing the backup copy of a cart is not
+     * a reason to stop answering the shopper holding it.
+     */
+    const [, mirrored] = await Promise.allSettled([
+      this.fast.put(key, value, options),
+      this.durable.put(key, value, options),
+    ]);
+
+    if (mirrored.status === 'rejected') {
+      console.log('[store:mirror-failed]', key, String(mirrored.reason));
+    }
+  }
+
+  async delete(key: string): Promise<void> {
+    const [, mirrored] = await Promise.allSettled([
+      this.fast.delete(key),
+      this.durable.delete(key),
+    ]);
+
+    /*
+     * A delete that only half-lands is the one failure worth caring about: it
+     * leaves a row in Supabase that Redis has forgotten, which a later Redis
+     * outage would serve back as if it were current. Rows carry expires_at,
+     * so it ages out on its own — but it is logged so a pattern of them is
+     * visible rather than inferred.
+     */
+    if (mirrored.status === 'rejected') {
+      console.log('[store:mirror-delete-failed]', key, String(mirrored.reason));
+    }
+  }
+}
