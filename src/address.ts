@@ -212,7 +212,21 @@ export function toShopifyAddress(a: ShippingAddress, fallbackPhone: string): Rec
     address1: [a.house_number, a.address].filter(Boolean).join(', ') || a.address,
     ...(line2 ? { address2: line2 } : {}),
     city: a.city,
-    ...(a.state ? { provinceCode: undefined, province: a.state } : {}),
+    /*
+     * The state is deliberately not sent.
+     *
+     * MailingAddressInput takes `provinceCode` — a two-letter code — and has
+     * no `province` field at all. This used to send `province: a.state`, which
+     * survived only because Meta's India form returns no state: the spread was
+     * empty every time. The first address that carried one would have failed
+     * the whole mutation on an unknown field, and it would have failed after
+     * the shopper had paid.
+     *
+     * Sending provinceCode instead would need a full-name-to-code table
+     * ("Maharashtra" → "MH") kept in step with Meta's spelling. Not worth it:
+     * Shopify derives the province from an Indian PIN code on its own, which
+     * is where the MH on order #26073 came from.
+     */
     zip: a.in_pin_code,
     countryCode: 'IN',
     phone: a.phone_number || fallbackPhone,

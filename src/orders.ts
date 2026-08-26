@@ -330,8 +330,23 @@ export async function createShopifyOrder(
     note,
     tags,
     phone: input.contact || `+${input.waId.replace(/\D/g, '')}`,
+    /*
+     * The same address on both, because the chat only ever collects one.
+     *
+     * Shopify left billing blank otherwise, and blank is not neutral: it is
+     * what a payment gateway reads for AVS, what an invoice prints, and what
+     * a GST invoice needs to be a valid one. A shopper who gave us an address
+     * and then sees "No billing address provided" on their receipt has been
+     * told something untrue about what they filled in.
+     *
+     * If a separate billing address is ever collected, this is the line that
+     * splits — not toShopifyAddress, which is about shape, not purpose.
+     */
     ...(input.shipping
-      ? { shippingAddress: toShopifyAddress(input.shipping, `+${input.waId.replace(/\D/g, '')}`) }
+      ? (() => {
+          const address = toShopifyAddress(input.shipping, `+${input.waId.replace(/\D/g, '')}`);
+          return { shippingAddress: address, billingAddress: address };
+        })()
       : {}),
     /*
      * The same code the shopper was quoted, so Shopify computes the discount
