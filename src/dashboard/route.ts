@@ -5,6 +5,7 @@
  *   GET  /dashboard/api?token=…      the data as JSON
  *   GET  /dashboard/api/transcript   one shopper's messages
  *   POST /dashboard/api/callback     mark a callback handled — the ONLY write
+ *   POST /dashboard/api/analyse      ask Claude what the numbers mean
  *
  * This file no longer renders anything. It used to serve a server-rendered
  * report as well, which meant two dashboards existed side by side and the
@@ -29,6 +30,7 @@ import { defaultRange, loadDashboard, markCalled, type DashboardData } from './q
 import { loadAnalytics, transcript, type AnalyticsData } from './queries-analytics.js';
 import { humaniseTranscript } from './transcript-text.js';
 import { DEFAULT_TTL_SECONDS, sign, verify } from './jwt.js';
+import { analyse } from './analyse.js';
 
 export interface DashboardEnv {
   SUPABASE_URL?: string;
@@ -37,6 +39,8 @@ export interface DashboardEnv {
   /** Signs dashboard sessions. Falls back to DASHBOARD_TOKEN when unset. */
   DASHBOARD_JWT_SECRET?: string;
   PHONE_NUMBER_ID?: string;
+  /** Reads the dashboard and answers questions about it. See analyse.ts. */
+  ANTHROPIC_API_KEY?: string;
 }
 
 /** JSON, with caching off — every one of these carries account data. */
@@ -123,7 +127,13 @@ export async function handleDashboard(
   // named here rather than inside the check below so the write surface stays
   // readable: two paths accept anything but GET, and they are both listed.
   const isAuth = path === '/dashboard/auth' && request.method === 'POST';
-  if (request.method !== 'GET' && !isCallbackWrite && !isAuth) {
+  /*
+   * The third POST, and the only one that spends money. Gated by the same
+   * credential as the rest of the dashboard for now; it wants an admin role of
+   * its own once there is more than one role.
+   */
+  const isAnalyse = path === '/dashboard/api/analyse' && request.method === 'POST';
+  if (request.method !== 'GET' && !isCallbackWrite && !isAuth && !isAnalyse) {
     return new Response('Method not allowed', { status: 405 });
   }
 
@@ -311,6 +321,26 @@ export async function handleDashboard(
       status: 200,
       headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
     });
+  }
+
+  /*
+   * What the numbers mean.
+   *
+   * Placed here rather than earlier because it needs exactly what the report
+   * needs — the same DashboardData and the same analytics block — so the answer
+   * is about the figures on screen and not a separate query that drifted.
+   */
+  if (isAnalyse) {
+    let body: { question?: string };
+    try {
+      body = (await request.json()) as { question?: string };
+    } catch {
+      return json({ error: 'Expected a JSON body with a question field.' }, 400);
+    }
+
+    const result = await analyse(env, String(body.question ?? ''), { ...data, analytics });
+    if (!result.ok) return json({ error: result.error }, result.status);
+    return json({ answer: result.text, usage: result.usage, range: data.range });
   }
 
   if (path === '/dashboard/api') {

@@ -36,6 +36,7 @@ export const CONFIG_KEYS = [
 
   // Dashboard
   'DASHBOARD_TOKEN',
+  'ANTHROPIC_API_KEY',
 
   // Deployment
   'PORT',
@@ -98,6 +99,9 @@ export function configWarnings(config: Config): string[] {
   // No Anthropic warning: the free-text stylist was removed in e32e866, and
   // ranking has always been deterministic. Warning about a key nothing reads
   // would send somebody hunting for a feature that is not there.
+  if (!config.ANTHROPIC_API_KEY) {
+    warn.push('ANTHROPIC_API_KEY unset — /dashboard/api/analyse will refuse every request.');
+  }
   if (!config.DASHBOARD_TOKEN) {
     warn.push('DASHBOARD_TOKEN unset — the dashboard route refuses every request.');
   }

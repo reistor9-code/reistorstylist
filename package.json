@@ -2,7 +2,7 @@
   "name": "reistor-ai-stylist",
   "version": "0.1.0",
   "private": true,
-  "description": "Reistor AI Stylist \u2014 WhatsApp Cloud API bot on Cloudflare Workers",
+  "description": "Reistor AI Stylist — WhatsApp Cloud API bot on Cloudflare Workers",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
@@ -22,6 +22,7 @@
     "wrangler": "^4.120.1"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.120.0",
     "redis": "^6.2.1"
   }
 }
